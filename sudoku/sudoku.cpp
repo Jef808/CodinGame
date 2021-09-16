@@ -38,7 +38,8 @@ private:
     std::array<int, 81> m_board;
 };
 
-struct Solver {
+class Solver {
+public:
     using Move = Sudoku::Move;
 
     Solver(Sudoku& _board)
@@ -58,6 +59,13 @@ struct Solver {
      * Pop the top of both our stacks.
      */
     void backtrack();
+
+private:
+    Sudoku& board;
+    std::deque<Move> edges;
+    std::deque<std::array<Move, 9>> valid_moves;
+    bool m_winner { false };
+
     /**
      * Apply the move and push it on the dfs stack.
      */
@@ -67,11 +75,6 @@ struct Solver {
      * and push them on the valid_moves stack.
      */
     const std::array<Move, 9>& push_next_moves(int hole_ndx);
-
-    Sudoku& board;
-    std::deque<Move> edges;
-    std::deque<std::array<Move, 9>> valid_moves;
-    bool m_winner { false };
 };
 
 struct Indexer {
