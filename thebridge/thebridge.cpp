@@ -1,98 +1,70 @@
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <deque>
 #include <iostream>
-#include <memory>
+#include <numeric>
 #include <string>
 #include <vector>
 
-struct Road {
+
+struct Stopwatch
+{
+    using sc = std::chrono::steady_clock;
+    Stopwatch() :
+        m_start{ sc::now() }
+    {}
+
+    double operator()() {
+        return std::chrono::duration_cast<std::chrono::milliseconds>(sc::now() - m_start).count();
+    }
+    bool still_time(int time) {
+        return std::chrono::duration_cast<std::chrono::milliseconds>(sc::now() - m_start).count() < time;
+    }
+    void reset() {
+        m_start = sc::now();
+    }
+
+    decltype(sc::now()) m_start;
+};
+
+
+struct Road
+{
+    using hole_iterator = std::vector<int>::const_iterator;
+
     std::array<std::vector<int>, 4> holes;
     int length;
+
     void input(std::istream& _in);
-    void show(std::ostream& _out);
+    void show(std::ostream& _out) const;
+
+    hole_iterator begin(int i) const { return holes[i].begin(); }
+    hole_iterator end(int i)   const { return holes[i].end();   }
 };
 
-void Road::input(std::istream& _in)
+
+struct Bikes
 {
-    std::string buf;
-    for (int i=0; i<4; ++i) {
-        std::getline(_in, buf);
-        length = buf.size();
-        for (int j=0; j<buf.size(); ++j)
-            if (buf[j] == '0')
-                holes[i].push_back(j);
-    }
-}
-
-void Road::show(std::ostream& _out)
-{
-    for (int i=0; i<4; ++i) {
-        for (const auto h : holes[i])
-            _out << h << ' ';
-        _out << '\n';
-    }
-
-}
-
-struct Bikes {
     Bikes() :
-        active{false},
-        pos{0},
-        speed{1}
+        active{0,0,0,0}, pos{0}, speed{1}
     {}
+
     std::array<bool, 4> active;
-    int nb_bikes;
-    int pos;
-    int speed;
+    int nb_bikes,
+        pos,
+        speed;
+
     void input(std::istream& _in);
 };
 
-/** Update the bikes struct with the online info */
-void Bikes::input(std::istream& _in)
+
+struct State
 {
-    _in >> speed;
-    int x, y, a;  // x-coord, y-coord, active-or-not
-    for (int i=0; i<nb_bikes; ++i)
-    {
-        _in >> x >> y >> a;
-        bool is_active = (active[y] = (a == 1));
-        if (is_active)
-            pos = x;
-    }
-}
+    Bikes m_bikes;
+    Road* m_road;
+    int n_bks_left;
 
-/** Same as above but we discard the input */
-inline void ignore_turn_input(std::istream& _in, int n_bikes)
-{
-    int s, x, y, a;
-    _in >> s;
-    for (int i=0; i<n_bikes; ++i)
-        _in >> x >> y >> a;
-}
-
-bool operator==(const Bikes& a, const Bikes& b) {
-    return a.active == b.active
-        && a.pos == b.pos
-        && a.speed == b.speed;
-}
-
-/**
- * Not meant as an interface but holds all
- * the settings and state of the problem.
- */
-class Game
-{
-public:
-    Game() = default;
-
-    void initialize(std::istream&);
-    void turn_input(std::istream&);
-    void show(std::ostream&) const;
-    int n_bikes() const { return m_bikes_nb; }
-    int n_bikes_goal() const { return m_bikes_goal_nb; }
-    bool lost() const;
-    bool won() const;
     void speed();
     void slow();
     void up();
@@ -100,31 +72,281 @@ public:
     void jump();
     void wait();
 
-private:
-    Road m_road;
-    Bikes m_bikes;
-    int m_bikes_nb;
-    int m_bikes_goal_nb;
-
-public:
-    bool operator==(const Game& other) {
-        return m_bikes == other.m_bikes;
-    }
+    void show(std::ostream& _out) const;
 };
 
-/** Performs initial AND first turn input. */
-void Game::initialize(std::istream &_in)
+
+class Game {
+public:
+    Game() = default;
+
+    /** Performs initial AND first turn input. */
+    void initial_input(std::istream&);
+    /** Read from the stream but discard the data. */
+    void ignore_turn_input(std::istream& _in);
+    /** Update the bikes state from the game input. */
+    void turn_input(std::istream& _in)
+        { m_bikes.input(_in); }
+
+    /**
+     * True if the state has no chance of winning.
+     */
+    bool lost(const State& s) const
+        { return s.n_bks_left < n_bks_goal; }
+    /**
+     * True if didn't loose and the bikes are at the end of the bridge.
+     */
+    bool won(const State& s) const
+        { return !(lost(s)) && s.m_bikes.pos >= m_road.length; }
+    /**
+     * Smaller object for the Agent to manipulate.
+     */
+    State get_state()
+        { return State{ m_bikes, &m_road }; }
+
+    int n_bikes() const
+        { return n_bks; }
+    int n_bikes_goal() const
+        { return n_bks_goal; }
+    void show_road(std::ostream& _out) const
+        { m_road.show(_out); }
+    void show(std::ostream&) const;
+private:
+
+    Road m_road;
+    Bikes m_bikes;
+    int n_bks;
+    int n_bks_goal;
+};
+
+inline void State::speed()
 {
-    _in >> m_bikes_nb >> m_bikes_goal_nb;
-    _in.ignore();
+    ++m_bikes.speed;
+    wait();
+}
+
+inline void State::slow()
+{
+    m_bikes.speed -= (m_bikes.speed > 0 ? 1 : 0);
+    wait();
+}
+
+inline void State::up()
+{
+    if (!m_bikes.active[0])
+    {
+        for (int i=0; i<3; ++i)
+        m_bikes.active[i] = m_bikes.active[i+1];
+    }
+    wait();
+}
+
+inline void State::down()
+{
+    if (!m_bikes.active[4])
+    {
+        for (int i=0; i<3; ++i)
+        m_bikes.active[4-i] = m_bikes.active[3-i];
+    }
+    wait();
+}
+
+inline void State::jump()
+{
+    m_bikes.pos += m_bikes.speed;
+    for (int i=0; i<4; ++i) {
+    // Only die if new pos is on a hole
+    n_bks_left -= (
+    (m_bikes.active[i] =
+         std::find(m_road->begin(i), m_road->end(i), m_bikes.pos)
+             != m_road->end(i)));
+    }
+}
+inline void State::wait()
+{
+    int dest_pos = m_bikes.pos + m_bikes.speed;
+
+    for (int i=0; i<4; ++i)
+    {
+        if (!m_bikes.active[i]) continue;
+
+    // Check if the next hole is before or after the new pos
+    auto nex_hole = std::find_if(m_road->begin(i), m_road->end(i),
+        [p=m_bikes.pos](auto h_i){ return p < h_i; });
+
+    n_bks_left -= (
+        (m_bikes.active[i] =
+         (nex_hole != m_road->end(i)) && (*nex_hole > dest_pos)));
+    }
+    m_bikes.pos = dest_pos;
+}
+
+enum class Action {
+    None, Speed, Jump, Up, Down, Slow, Wait, Null=7
+};
+
+class Agent {
+public:
+    using Action_index = uint8_t;
+
+    Agent(Game& game) :
+        m_game(game)
+    {}
+    void init_state(const State& s)
+        { m_states.push_back(s); }
+
+    bool solve();
+    Action nex_action();
+    void set_timed_output(std::ostream&, int);
+
+private:
+    Game& m_game;
+    std::deque<int> m_actions_ndx;
+    std::deque<State> m_states;
+    bool m_win;
+    bool m_lost;
+    double m_time_limit { 80.0 };  // Have 150 ms per turn.
+    Stopwatch sw{};
+
+    void visit(const Action);
+    void backtrack();
+    const State& cur_state() const { return m_states.back(); }
+    int cur_action_ndx() { return m_actions_ndx.back(); }
+    Action cur_action() const { return Action{ m_actions_ndx.back() }; }
+    bool out_of_time();
+
+};
+
+void simul(State&, const Action, const Game&);
+
+inline void Agent::visit(const Action a)
+{
+    State nex = m_states.back();
+    m_states.push_back(std::move(nex));
+
+    simul(nex, a, m_game);
+}
+
+inline void Agent::backtrack()
+{
+    m_actions_ndx.pop_back();
+    m_states.pop_back();
+}
+
+Action Agent::nex_action()
+{
+    auto ndx = m_actions_ndx.front();
+    m_actions_ndx.pop_front();
+    return Action{ ndx };
+}
+
+bool Agent::solve()
+{
+    std::tie(m_win, m_lost) = std::tuple(m_game.won(cur_state()),
+                                         m_game.lost(cur_state()));
+    if (m_win) return true;
+    if (!m_lost)
+    {
+        for (int n=1; n<7; ++n)
+        {
+            visit(Action{ n });
+            if (solve())
+                return (m_win = true);
+        }
+    }
+    backtrack();
+    return false;
+}
+
+std::ostream& operator<<(std::ostream&, const Action);
+
+
+
+int main(int argc, char *argv[])
+{
+    std::ios_base::sync_with_stdio(false);
+
+
+    Game game{ };
+    game.initial_input(std::cin);
+
+    State state = game.get_state();
+
+    Agent agent{ game };
+    agent.init_state(state);
+
+    while (true)
+    {
+        std::cout << agent.nex_action() << std::endl;
+        game.ignore_turn_input(std::cin);
+    }
+
+    return EXIT_SUCCESS;
+}
+
+
+
+void Road::input(std::istream& _in)
+{
+    std::string buf;
+    for (int i=0; i<4; ++i)
+    {
+        std::getline(_in, buf);
+
+        for (int j=0; j<buf.size(); ++j)
+        {
+            if (buf[j] == '0')
+                holes[i].push_back(j);
+        }
+    }
+    length = buf.size();
+}
+
+void Road::show(std::ostream& _out) const
+{
+    for (int i=0; i<4; ++i)
+    {
+        for (int j=0; j<length; ++j)
+        {
+_out << (std::find(holes[i].begin(), holes[i].end(), j)
+         == holes[i].end() ? '-' : 'O');
+        }
+        _out << '\n';
+    }
+    _out << std::endl;
+}
+
+
+/** Update the bikes struct with the online info */
+void Bikes::input(std::istream& _in)
+{
+    int x, y, a;  // x-coord, y-coord, active-or-not
+    _in >> speed; _in.ignore();
+
+    for (int i=0; i<nb_bikes; ++i)
+    {
+        _in >> x >> y >> a; _in.ignore();
+        active[y] = (a == 1);
+    }
+
+    pos = x;
+}
+
+void Game::initial_input(std::istream &_in)
+{
+    _in >> n_bks
+        >> n_bks_goal; _in.ignore();
+
     m_road.input(_in);
-    m_bikes.nb_bikes = m_bikes_nb;
+    m_bikes.nb_bikes = n_bks;
     m_bikes.input(_in);
 }
 
-inline void Game::turn_input(std::istream& _in)
+inline void ignore_turn_input(std::istream& _in, int n_bikes)
 {
-    m_bikes.input(_in);
+    std::string buf;
+    for (int i=0; i<n_bikes+1; ++i)
+        std::getline(_in, buf);
 }
 
 void Game::show(std::ostream& _out) const
@@ -139,105 +361,28 @@ void Game::show(std::ostream& _out) const
     _out << std::endl;
 }
 
-inline bool Game::lost() const
+void State::show(std::ostream& _out) const
 {
-    return m_bikes_goal_nb < std::count(m_bikes.active.begin(), m_bikes.active.end(), true);
-}
+    _out << "Speed: " << m_bikes.speed
+         << "\nPos: " << m_bikes.pos << '\n';
 
-inline bool Game::won() const
-{
-    return m_bikes.pos >= m_road.length;
-}
-
-inline void Game::speed()
-{
-    ++m_bikes.speed;
-    wait();
-}
-
-inline void Game::slow()
-{
-    --m_bikes.speed;
-    wait();
-}
-
-inline void Game::up()
-{
-    if (m_bikes.active[0]) {
-        wait(); return;
-    }
-    for (int i=0; i<3; ++i)
-        m_bikes.active[i]
-            = m_bikes.active[i+1];
-    wait();
-}
-
-inline void Game::down()
-{
-    if (m_bikes.active[4]) {
-        wait(); return;
-    }
-    for (int i=0; i<3; ++i)
-        m_bikes.active[4-i]
-            = m_bikes.active[3-i];
-    wait();
-}
-
-inline void Game::jump()
-{
-    m_bikes.pos += m_bikes.speed;
     for (int i=0; i<4; ++i) {
-        if (!m_bikes.active[i])
-            continue;
-        auto hole_it = std::find_if(m_road.holes[i].begin(), m_road.holes[i].end(),
-          [p=m_bikes.pos](const auto h){
-              return h >= p;
-          });
-        if (*hole_it == m_bikes.pos)
-            m_bikes.active[i] = false;
+        _out << (m_bikes.active[i] ? 'Y' : 'N')
+             << '\n';
     }
+    _out << std::endl;
 }
 
-inline void Game::wait()
-{
-    int cur_pos = m_bikes.pos;
-    m_bikes.pos = cur_pos + m_bikes.speed;
-    for (int i=0; i<4; ++i) {
-        if (!m_bikes.active[i])
-            continue;
-        bool bike_falls = false;
-        auto hole_it = std::find_if(m_road.holes[i].begin(), m_road.holes[i].end(),
-          [p = cur_pos](const auto h) {
-              return h > p;
-          });
-        for (; hole_it != m_road.holes[i].end(); ++hole_it) {
-            if (*hole_it <= m_bikes.pos)
-                bike_falls = true;
-        }
-        if (bike_falls)
-            m_bikes.active[i] = false;
-    }
-}
-
-enum class Action {
-    Speed, Jump, Up, Down, Slow, Wait
-};
-
-Action& operator++(Action& a) {
-    if (a != Action::Wait)
-        a = Action(static_cast<int>(a)+1);
-    return a;
-}
-
-inline void simul(Game& game, const Action action)
+inline void simul(State& state, const Action action, const Game& game)
 {
     switch(action) {
-        case Action::Wait: game.wait(); break;
-        case Action::Speed: game.speed(); break;
-        case Action::Slow: game.slow(); break;
-        case Action::Up: game.up(); break;
-        case Action::Down: game.down(); break;
-        case Action::Jump: game.jump(); break;
+        case Action::Wait: state.wait(); break;
+        case Action::Speed: state.speed(); break;
+        case Action::Slow: state.slow(); break;
+        case Action::Up: state.up(); break;
+        case Action::Down: state.down(); break;
+        case Action::Jump: state.jump(); break;
+        default: return;
     }
 }
 
@@ -250,56 +395,6 @@ inline std::ostream& operator<<(std::ostream& _out, const Action action)
         case Action::Up: return _out << "UP";
         case Action::Down: return _out << "DOWN";
         case Action::Jump: return _out << "JUMP";
+        default: return _out << "NOTHING";
     }
-}
-
-
-class Agent {
-public:
-    Agent() = default;
-    void think(const Game& game);
-    const std::deque<Action>& actions_seq() const;
-private:
-    std::deque<Action> m_actions;
-    std::deque<Game> m_games;
-};
-
-void Agent::think(const Game& game)
-{
-    Action action = Action::Speed;
-    m_games.push_back(game);
-
-    bool done = false;
-    for (int i=0; i<6; ++i) {
-        Game _game = game;;
-        simul(_game, Action(i));
-        if (!_game.lost()) {
-
-            m_games.push_back(_game);
-            m_actions.push_back(Action(i));
-        }
-    }
-}
-
-const std::deque<Action>& Agent::actions_seq() const
-{
-    return m_actions;
-}
-
-int main(int argc, char *argv[])
-{
-    Game game{ };
-    game.initialize(std::cin);
-
-    Agent agent{ };
-    auto actions = agent.actions_seq();
-
-    while (!actions.empty()) {
-        Action action = actions.back();
-        actions.pop_back();
-        std::cout << action << std::endl;
-        ignore_turn_input(std::cin, game.n_bikes());
-    }
-
-    return EXIT_SUCCESS;
 }
