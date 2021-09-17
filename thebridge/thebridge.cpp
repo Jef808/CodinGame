@@ -1,13 +1,45 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <chrono>
 #include <deque>
 #include <iostream>
 #include <numeric>
 #include <string>
+#include <random>
 #include <vector>
 #include <tuple>
 
+
+struct Stopwatch {
+    Stopwatch() : m_start{std::chrono::steady_clock::now()}
+    { }
+    void reset() {
+        m_start = std::chrono::steady_clock::now();
+    }
+    auto time() {
+        return std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - m_start).count();
+    }
+    std::chrono::steady_clock::time_point m_start;
+};
+
+enum class Cell { Bridge, Hole };
+
+struct Roadv2 {
+    using hole_iterator = std::vector<Cell>::const_iterator;
+
+    /** Store every piece of the bridge for faster lookups */
+    std::array<std::vector<Cell>, 4> holes;
+    /** Keep the position of the last holes on the bridge. */
+    std::array<int, 4> last_holes;
+
+    void input(std::istream& _in);
+    void show(std::ostream& _out) const;
+
+    hole_iterator begin(int i) const { return holes[i].begin(); }
+    hole_iterator end(int i)   const { return holes[i].end();   }
+};
 
 struct Road
 {
@@ -47,6 +79,7 @@ int cnt_bikes(const Bikes& bikes) {
     return std::count(bikes.active.begin(), bikes.active.end(), 1);
 }
 
+
 struct State
 {
     State(const Bikes& bikes, Road* road) :
@@ -55,8 +88,11 @@ struct State
     }
     Bikes m_bikes;
     Road* m_road;
-    int n_bks_left;
+    Roadv2* m_roadv2;
     int n_turns;
+    int n_bks_left;
+
+    void set_roadv2(Roadv2* road2) { m_roadv2 = road2; }
 
     void apply(const Action a);
     void speed();
@@ -66,6 +102,11 @@ struct State
     void jump();
     void wait();
 
+    /**
+     * Ret1: True if there is a whole between pos+1 and npos (can't speed or wait)
+     * Ret2: True if npos has a hole (can't jump)
+     */
+    //std::pair<bool, bool> holes_ahead(const Roadv2& r, int pos, int npos, int lane) const;
     /**
      * Checks if there is a hole ahead of current position,
      * up to the given end point.
@@ -77,11 +118,8 @@ struct State
      * Only checks for a hole at a prescribed position, for jumps
      */
     bool has_hole_at(int pos, int lane) const;
-    /**
-     * Display the parameters of the state.
-     */
-    void show(std::ostream& _out) const;
 
+    void show(std::ostream& _out) const;
 };
 
 // To be deprecated...
@@ -116,6 +154,11 @@ public:
      */
     State get_state()
         { return State{ m_bikes, &m_road }; }
+     /**
+     * Display some info.
+     */
+    void show(std::ostream& _out) const;
+
 private:
     Road m_road;
     Bikes m_bikes;
@@ -134,8 +177,13 @@ public:
         m_lost{false}
     {}
 
+    bool solver() {
+        m_sw.reset();
+        return solve();
+    }
     bool solve();
     Action nex_action();
+    bool won() const { return m_win; }
     //const std::deque<int>& actions() const { return m_actions_ndx; }
 
 private:
@@ -144,31 +192,51 @@ private:
     std::deque<State> m_states;
     bool m_win;
     bool m_lost;
+    int m_timelim{ 130 };
+    Stopwatch m_sw;
 
+    bool out_of_time() {
+        auto elapsed = m_sw.time();
+        // std::cerr << elapsed << std::endl;
+        return (elapsed > m_timelim);
+    }
     void visit(const int ndx);
     void backtrack();
-    const std::array<int, 6>& candidate_actions() const;
+    std::array<int, 6> candidate_actions();
     const State& cur_state() const { return m_states.back(); }
 };
 
-std::pair<bool, bool> State::holes_ahead(int end, int lane) const
+// NOTE: Defining no_holes_excl first then no_holes_incl, you run into
+// problems when pos = 0 and there are no hole along the lane...
+std::pair<bool, bool> State::holes_ahead(int nex_pos, int lane) const
 {
-    // Check if the next hole is before or after the new pos
+    // Find the first hole that's past the current bikes' position
     auto nex_hole = std::find_if(m_road->begin(lane), m_road->end(lane),
                                  [p=m_bikes.pos](auto h_i){ return p < h_i; });
-    // Excluding the end-point:
-    bool no_holes_exc = (
-        (nex_hole == m_road->end(lane)) || (*nex_hole >= end));
-    // Including it:
-    bool no_holes_inc = no_holes_exc && (*nex_hole != end);
 
-    return std::make_pair(!no_holes_exc, !no_holes_inc);
+    // Checking if we're good up to the end point)
+    bool no_holes_incl = (nex_hole == m_road->end(lane) || (*nex_hole > nex_pos));
+
+    // Relaxing the check to allow for a hole at the end-point
+    bool no_holes_excl = (no_holes_incl || (*nex_hole == nex_pos));
+
+    return std::make_pair(!no_holes_excl, !no_holes_incl);
 }
 
 inline bool State::has_hole_at(int pos, int lane) const
 {
     return std::find(m_road->begin(lane), m_road->end(lane), pos) != m_road->end(lane);
 }
+
+// NOTE: The top lane has index 0 and bottom has index 3.
+// When generating the candidate actions, we avoid UP,
+// (resp DOWN) when the top (resp bottom) lanes are active.
+//
+//  0
+//  1
+//  2
+//  3
+//
 
 inline void State::speed()
 {
@@ -184,11 +252,6 @@ inline void State::slow()
 
 void State::up()
 {
-    // NOTE: This is important but we check this in candidate_actions()
-    // if (m_bikes.active[0]) {
-    //     wait();
-    //     return;
-    // }
     int dest_pos = m_bikes.pos + m_bikes.speed;
 
     std::array<std::pair<bool, bool>, 4> holes_ahead_dat {
@@ -197,70 +260,32 @@ void State::up()
         holes_ahead(dest_pos, 2),
         holes_ahead(dest_pos, 3)
     };
+    n_bks_left = 0;
 
-    // For the bottom 3 lanes, set the status of the bike in the lane
-    // right above it for the next turn:
-    for (int i=0; i<3; ++i)
-    {
-        bool incoming = m_bikes.active[i+1];
-        if (!incoming)
-        {
-            m_bikes.active[i] = false;
-            continue;
-        }
-
-        bool fall = (holes_ahead_dat[i+1].first || holes_ahead_dat[i].second);
-        // since we're going up in indices...
-        if (fall) {
-            --n_bks_left;
-            m_bikes.active[i] = false;
-        }
-
-        m_bikes.active[i] = true;
+    for (int i=0; i<3; ++i){
+    // Check that the incoming lane (below) was active and the bike didn't fall.
+    n_bks_left += (m_bikes.active[i] = (m_bikes.active[i+1]
+                    && !(holes_ahead_dat[i+1].first || holes_ahead_dat[i].second)));
     }
+
     m_bikes.pos = dest_pos;
 }
 
 void State::down()
 {
-    // 3 corresponds to the bottom lane:
-    // If there is a bike in the bottom lane, this just becomes a wait.
-    //
-    // NOTE: This is important but we check this in candidate_actions()
-    // if (m_bikes.active[3]) {
-    //     wait();
-    //     return;
-    // }
     int dest_pos = m_bikes.pos + m_bikes.speed;
 
     std::array<std::pair<bool, bool>, 4> holes_ahead_dat {
-    holes_ahead(dest_pos, 0),
-    holes_ahead(dest_pos, 1),
-    holes_ahead(dest_pos, 2),
-    holes_ahead(dest_pos, 3)
+        holes_ahead(dest_pos, 0),
+        holes_ahead(dest_pos, 1),
+        holes_ahead(dest_pos, 2),
+        holes_ahead(dest_pos, 3)
     };
+    n_bks_left = 0;
 
-    // For the bottom 3 lanes, set the status of the bike in the lane
-    // right above it for the next turn:
-    for (int i=3; i>0; --i)
-    {
-        bool incoming = m_bikes.active[i-1];
-        if (!incoming)
-        {
-            m_bikes.active[i] = false;
-            continue;
-        }
-
-        bool fall = (holes_ahead_dat[i-1].first || holes_ahead_dat[i].second);
-        // since we're going up in indices...
-        if (fall) {
-            --n_bks_left;
-            m_bikes.active[i] = false;
-        }
-
-        m_bikes.active[i] = true;
-        //NOTE: We need to make sure nobody is in the third lane at first for this
-        // to work, and do it in this order!
+    for (int i=3; i>0; --i){
+    n_bks_left += (m_bikes.active[i] = (m_bikes.active[i-1]
+                    && !(holes_ahead_dat[i-1].first || holes_ahead_dat[i].second)));
     }
 
     m_bikes.pos = dest_pos;
@@ -269,34 +294,31 @@ void State::down()
 inline void State::jump()
 {
     int dest_pos = m_bikes.pos + m_bikes.speed;
+    n_bks_left = 0;
 
     for (int i=0; i<4; ++i) {
-        if (!m_bikes.active[i]) continue;
-
-        n_bks_left -= (
-            !(m_bikes.active[i] = !has_hole_at(dest_pos, i)));
+        n_bks_left += (m_bikes.active[i] &= !(has_hole_at(dest_pos, i)));
     }
     m_bikes.pos = dest_pos;
 }
+
 inline void State::wait()
 {
-    int dest_pos = m_bikes.pos + m_bikes.speed;
-
-    for (int i=0; i<4; ++i) {
-        if (!m_bikes.active[i]) continue;
-
-        n_bks_left -= (
-            !(m_bikes.active[i] = !holes_ahead(dest_pos, i).second));
+   int dest_pos = m_bikes.pos + m_bikes.speed;
+   n_bks_left = 0;
+   for (int i=0; i<4; ++i) {
+         n_bks_left += (m_bikes.active[i] &= !(holes_ahead(dest_pos, i).second));
     }
-    m_bikes.pos = dest_pos;
+     m_bikes.pos = dest_pos;
 }
 
 inline void Agent::visit(const int a)
 {
     const State& nex = m_states.back();
     m_states.push_back(nex);
-    m_states.back().apply(Action{ a });
     m_actions_ndx.push_back(a);
+
+    m_states.back().apply(Action{ a });
 }
 
 inline void Agent::backtrack()
@@ -307,55 +329,52 @@ inline void Agent::backtrack()
 
 Action Agent::nex_action()
 {
-    auto a = m_actions_ndx.empty()
-        ? Action::Wait
-        : Action{ m_actions_ndx.front() };
+    if (m_actions_ndx.empty()) return Action::Speed;
+
+    auto a = m_actions_ndx.front();
     m_actions_ndx.pop_front();
-    return a;
+    return Action{ a };
 }
 
+// UP = 3, DOWN = 4.
 constexpr  std::array<int, 6> no_updown = { 1, 2, 5, 6, 0, 0 };
 constexpr  std::array<int, 6> no_up =     { 1, 2, 4, 5, 6, 0 };
 constexpr  std::array<int, 6> no_down =   { 1, 2, 3, 5, 6, 0 };
 constexpr  std::array<int, 6> all_acts =  { 1, 2, 3, 4, 5, 6 };
 
-// enum class Action {
-//     None=0, Speed=1, Jump=2, Up=3, Down=4, Slow=5, Wait=6, Null=7
-// };
 
-
-// NOTE: It would be much more natural to have a helper class
-// keeping track of the holes ahead of the bikes...
-const std::array<int, 6>& Agent::candidate_actions() const
+/**
+ * For now this only gets rid of Up and Down when the
+ * extremal lanes are occupied.
+ */
+std::array<int, 6> Agent::candidate_actions()
 {
+    using uid = std::uniform_int_distribution<int>;
+
+    std::array<int, 6> ret;
     const State& s = cur_state();
 
-    // The top lane is occupied
-    bool top = s.m_bikes.active[0];
-    bool bot = s.m_bikes.active[3];
+    bool top = s.m_bikes.active[0];   // Means can't go up
+    bool bot = s.m_bikes.active[3];   // Means can't go down
 
     if (top) {
         if (bot) {
-            return all_acts;
+            ret = no_updown;
         } else {
-            return no_down;
+            ret = no_up;
         }
     } else {
         if (bot) {
-            return no_up;
+            ret = no_down;
         } else {
-            return no_updown;
+            ret = all_acts;
+            // Mix up the order of UP/DOWN randomly
+            if (int i = rand() % 2)
+                std::swap(ret[2], ret[3]);
         }
     }
 
-    // Could maybe help here with:
-    // - e.g. Prune for speed given the distance to the end,
-    // - e.g. Also given number of turns left
-    // - e.g. Need to match certain speeds to jump accross wide holes
-
-    // int n_surplus = m_game.n_bikes_goal() - s.n_bks_left;
-    // int n_turns_left = 50 - s.n_turns;
-    // int dist_to_end = m_game.road_length() - s.m_bikes.pos;
+    return ret;
 }
 
 bool Agent::solve()
@@ -363,25 +382,43 @@ bool Agent::solve()
     std::tie(m_win, m_lost) = std::tuple(m_game.won(cur_state()),
                                          m_game.lost(cur_state()));
 
+    //cur_state().show(std::cerr);
+
     if (m_win) {
-        //std::cerr << "Found win!" << std::endl;
+        //std::cerr << "Found Win!\n************" << std::endl;
         return true;
     }
+
     if (!m_lost)
     {
-        //for (const auto a : {1, 2, 3, 4, 5, 6 })
+        // We return true but the m_win member bool will still be off.
+        // This way we can go back to main but come back here to continue the job.
+
+        if (out_of_time()) return true;
+
         for (const auto a : candidate_actions())
         {
+
+            // We pad the std::array with zeros instead of allocating vectors so
+            // there are some bad values
             if (a == 0) continue;
 
+            //std::cerr << "Doing " << Action{ a } << std::endl;
+
+            // Note: we don't mark the bool m_win here because we could be returning
+            // from the out_of_time check.
             visit(a);
             if (solve())
                 return true;
         }
     }
+
+    //std::cerr << "Backtracking...\n*******" << std::endl;
+
     backtrack();
     return false;
 }
+
 
 void Road::input(std::istream& _in)
 {
@@ -397,6 +434,22 @@ void Road::input(std::istream& _in)
     }
     length = buf.size();
 }
+void Roadv2::input(std::istream& _in)
+{
+    std::string buf;
+    for (int i=0; i<4; ++i)
+    {
+        std::getline(_in, buf);
+        std::transform(buf.begin(), buf.end(), std::back_inserter(holes[i]),
+            [](const auto c){ return c == '-' ? Cell::Bridge : Cell::Hole; });
+    }
+    last_holes = { 0, 0, 0, 0 };
+    for (int i=0; i<4; ++i) {
+        auto last_hole = std::find(holes[i].rbegin(), holes[i].rend(), Cell::Hole);
+        if (last_hole != holes[i].rend())
+            last_holes[i] = holes[i].size() - std::distance(holes[i].rbegin(), last_hole);
+    }
+}
 /** Update the bikes struct with the online info */
 void Bikes::input(std::istream& _in)
 {
@@ -408,7 +461,6 @@ void Bikes::input(std::istream& _in)
         _in >> x >> y >> a; _in.ignore();
         active[y] = (a == 1);
     }
-
     pos = x;
 }
 void Game::initial_input(std::istream &_in)
@@ -430,26 +482,37 @@ void Road::show(std::ostream& _out) const
 {
     for (int i=0; i<4; ++i)
     {
+        auto nex_hole_it = holes[i].begin();
         for (int j=0; j<length; ++j)
         {
-_out << (std::find(holes[i].begin(), holes[i].end(), j)
-         == holes[i].end() ? '-' : 'O');
+            if (j == *nex_hole_it){
+                ++nex_hole_it;
+                _out << '0';
+            } else {
+                _out << '-';
+            }
         }
-        _out << '\n';
+        _out << std::endl;
     }
-    _out << std::endl;
 }
 void State::show(std::ostream& _out) const
 {
     _out << "Speed: " << m_bikes.speed
-         << "\nPos: " << m_bikes.pos << '\n'
-         << "n_bikes_left: " << n_bks_left << '\n';
+         << "\nPos: " << m_bikes.pos
+         << "\nn_bikes_left: " << n_bks_left << std::endl;
 
     for (int i=0; i<4; ++i) {
-        _out << (m_bikes.active[i] ? 'Y' : 'N')
-             << '\n';
+        _out << (m_bikes.active[i] ? 'Y' : 'N') << std::endl;
     }
-    _out << std::endl;
+}
+void Game::show(std::ostream& _out) const
+{
+    _out << "Speed: " << m_bikes.speed
+         << "\nPos: " << m_bikes.pos << std::endl;
+
+    for (int i=0; i<4; ++i) {
+        _out << (m_bikes.active[i] ? 'Y' : 'N') << std::endl;
+    }
 }
 
 inline void State::apply(const Action action)
@@ -479,32 +542,6 @@ inline std::ostream& operator<<(std::ostream& _out, const Action action)
     }
 }
 
-struct Simul_debug {
-    Simul_debug(const State& state, const std::deque<int>& actions) :
-        m_state{state}, m_actions_ndx{actions}
-    {}
-
-    void operator()(std::istream& _in, std::ostream& _out)
-    {
-        if (m_actions_ndx.empty()) {
-            m_state.apply(Action::Wait);
-        } else {
-            m_state.apply(Action{ m_actions_ndx.front() });
-            m_actions_ndx.pop_front();
-        }
-
-        _out << "Simulated bikes:" << std::endl;
-        m_state.show(_out);
-
-        m_state.m_bikes.input(_in);
-
-        _out << "Actual bikes:" << std::endl;
-        m_state.show(_out);
-    }
-
-    State m_state;
-    std::deque<int> m_actions_ndx;
-};
 
 int main(int argc, char *argv[])
 {
@@ -514,19 +551,28 @@ int main(int argc, char *argv[])
     game.initial_input(std::cin);
 
     Agent agent{ game };
-    bool done = agent.solve();
-    assert(done);
+    agent.solver();
+    bool done = agent.won();
 
-    // For debugging
-    //Simul_debug debug_turn{ agent };
+    // Let the agent go back to think if doesn't have a winning
+    // path after the first timelimit is attained.
+    while (!done) {
+        std::cout << agent.nex_action() << std::endl;
+        game.ignore_turn_input(std::cin);
+        agent.solver();
+        done = agent.won();
+    }
 
+    // Once done == true, we know the action queue contains a
+    // winning sequence.
     while (true)
     {
         std::cout << agent.nex_action() << std::endl;
 
         //debug_turn(std::cin, std::cerr);
         game.ignore_turn_input(std::cin);
-
+        //game.turn_input(std::cin);
+        //game.show(std::cerr);
     }
 
     return EXIT_SUCCESS;
