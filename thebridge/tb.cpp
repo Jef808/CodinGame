@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <chrono>
 #include <deque>
 #include <iostream>
 #include <fstream>
@@ -68,8 +69,11 @@ public:
 
 private:
     State* pstate;
-    static GameParams* pparams;
+    GameParams* const pparams = &params;
 };
+
+void nex_holes_dists(const GameParams::Road& r);
+std::array<std::vector<int>, 4> nex_holes;
 
 void Game::init(std::istream& _in) {
     std::string buf;
@@ -84,7 +88,7 @@ void Game::init(std::istream& _in) {
                        [](const auto c){ return c == '0' ? GameParams::Cell::Hole : GameParams::Cell::Bridge; });
     }
 
-    Game::pparams = &params;
+    nex_holes_dists(params.road);
 }
 
 State input_turn(std::istream& _in) {
@@ -93,7 +97,7 @@ State input_turn(std::istream& _in) {
     int x, y, a;  // x-coord, y-coord, active-or-not
     _in >> state.speed; _in.ignore();
 
-    for (int i=0; i<4; ++i)
+    for (int i=0; i<params.start_bikes; ++i)
     {
         _in >> x >> y >> a; _in.ignore();
 
@@ -127,16 +131,22 @@ inline bool Game::is_won() const {
     return pstate->pos >= pparams->road[0].size();
 }
 
-std::array<int, 4> next_holes(const State& s, const GameParams::Road& r) {
+void nex_holes_dists(const GameParams::Road& r) {
     using Cell = GameParams::Cell;
-    std::array<int, 4> ret;
-    for (size_t i=0; i<4; ++i) {
-        auto it = std::find(r[i].begin() + s.pos + 1, r[i].end(), Cell::Hole);
-        ret[i] = (it == r[i].end()
-                    ? std::numeric_limits<int>::max()
-                    : std::distance(r[i].begin(), it));
+    for (int i=0; i<4; ++i) {
+        auto& holed_i = nex_holes[i];
+        auto pos_it = r[i].begin();
+        auto hol_it = pos_it;
+        do
+        {
+            hol_it = std::find(pos_it + 1, r[i].end(), Cell::Hole);
+            while (pos_it != hol_it) {
+                holed_i.push_back(std::distance(pos_it, hol_it));
+                ++pos_it;
+            }
+
+        } while (hol_it != r[i].end());
     }
-    return ret;
 }
 
 // List of actions such that the number of bikes wouldn't
@@ -149,15 +159,10 @@ std::pair<bool, const Game::ActionList&> Game::candidates() const {
     static std::vector<Action> cands;
     cands.clear();
 
-    std::array<int, 4> nexhole = next_holes(*pstate, pparams->road);
-    for (size_t i=0; i<4; ++i) {
-        auto it = std::find(pparams->road[i].begin() + pstate->pos + 1, pparams->road[i].end(), Cell::Hole);
-        nexhole[i] = (it == pparams->road[i].end()
-                        ? std::numeric_limits<int>::max()
-                        : std::distance(pparams->road[i].begin(), it));
-    }
-    bool no_hole = std::all_of(nexhole.begin(), nexhole.end(), [](auto h){
-            h == std::numeric_limits<int>::max();
+    const std::array<std::vector<int>, 4>& nexhole = nex_holes;
+
+    bool no_hole = std::none_of(nexhole.begin(), nexhole.end(), [pos = pstate->pos](const auto& hs){
+        return hs[pos] >= hs.size() - pos;
     });
     if (no_hole) {
         cands.push_back(Action::Speed);
@@ -177,12 +182,13 @@ std::pair<bool, const Game::ActionList&> Game::candidates() const {
         return ndeaths[to_int(a)] = std::count(deaths.begin(), deaths.end(), true);
     };
 
-    size_t npos = pstate->pos + pstate->speed;
+    size_t p = pstate->pos;
+    size_t s = pstate->speed;
 
     // Slow
-    if (pstate->speed > 0) {
+    if (s > 0) {
         for (int i=0; i<4; ++i) {
-            deaths[i] = pstate->bikes[i] && (nexhole[i] < npos - 1);
+            deaths[i] = pstate->bikes[i] && (nexhole[i][p] < s - 1);
         }
         if (is_ok(record_deaths(Action::Speed)))
             cands.push_back(Action::Slow);
@@ -190,15 +196,15 @@ std::pair<bool, const Game::ActionList&> Game::candidates() const {
     // Wait
     if (is_cand(Action::Slow)) {
         for (int i=0; i<4; ++i) {
-            deaths[i] = pstate->bikes[i] && (nexhole[i] <= npos);
+            deaths[i] = pstate->bikes[i] && (nexhole[i][p] <= s);
         }
         if (is_ok(record_deaths(Action::Wait)))
             cands.push_back(Action::Wait);
     }
     // Speed
-    if (is_cand(Action::Wait) && pstate->speed < 50) {
+    if (is_cand(Action::Wait) && s < 50) {
         for (int i=0; i<4; ++i) {
-            deaths[i] = pstate->bikes[i] && (nexhole[i] <= npos + 1);
+            deaths[i] = pstate->bikes[i] && (nexhole[i][p] <= s + 1);
         }
         if (is_ok(record_deaths(Action::Speed)))
             cands.push_back(Action::Speed);
@@ -206,7 +212,7 @@ std::pair<bool, const Game::ActionList&> Game::candidates() const {
     // Jump
     if (!is_cand(Action::Wait)) {
         for (int i=0; i<4; ++i) {
-            deaths[i] = pstate->bikes[i] && (nexhole[i] == npos);
+            deaths[i] = pstate->bikes[i] && (nexhole[i][p] == s);
         }
         if (is_ok(record_deaths(Action::Jump)))
             cands.push_back(Action::Jump);
@@ -214,7 +220,7 @@ std::pair<bool, const Game::ActionList&> Game::candidates() const {
     // Up
     if (!pstate->bikes[0]) {
         for (int i=1; i<4; ++i) {
-            deaths[i] = pstate->bikes[i] && (nexhole[i] < npos || nexhole[i-1] <= npos);
+            deaths[i] = pstate->bikes[i] && (nexhole[i][p] < s || nexhole[i-1][p] <= s);
         }
         if (is_ok(record_deaths(Action::Up)))
             cands.push_back(Action::Up);
@@ -222,7 +228,7 @@ std::pair<bool, const Game::ActionList&> Game::candidates() const {
     // Down
     if (!pstate->bikes[3]) {
         for (int i=0; i<3; ++i) {
-            deaths[i] = pstate->bikes[i] && (nexhole[i] < npos || nexhole[i+1] <= npos);
+            deaths[i] = pstate->bikes[i] && (nexhole[i][p] < s || nexhole[i+1][p] <= s);
         }
         if (is_ok(record_deaths(Action::Down)))
             cands.push_back(Action::Down);
@@ -245,53 +251,49 @@ std::pair<bool, const Game::ActionList&> Game::candidates() const {
 }
 
 // TODO: Save the results of next_holes dynamically for later usage.
-inline void wait(State& s, GameParams::Road& r) {
-    std::array<int, 4> nexhole = next_holes(s, r);
+inline void wait(State& s) {
     for (int i=0; i<4; ++i) {
-        s.bikes[i] &= nexhole[i] <= s.pos + s.speed;
+        s.bikes[i] &= nex_holes[i][s.pos] <= s.speed;
     }
     s.pos += s.speed;
 }
 
-inline void slow(State& s, GameParams::Road& r) {
+inline void slow(State& s) {
     --s.speed;
-    wait(s, r);
+    wait(s);
 }
 
-inline void speed(State& s, GameParams::Road& r) {
+inline void speed(State& s) {
     ++s.speed;
-    wait(s, r);
+    wait(s);
 }
 
-inline void jump(State& s, GameParams::Road& r) {
-    std::array<int, 4> nexhole = next_holes(s, r);
+inline void jump(State& s) {
     for (int i=0; i<4; ++i) {
-        s.bikes[i] &= nexhole[i] != s.pos + s.speed;
+        s.bikes[i] &= nex_holes[i][s.pos] != s.speed;
     }
     s.pos += s.speed;
 }
 
-inline void up(State& s, GameParams::Road& r) {
+inline void up(State& s) {
     if (s.bikes[0]) return;
 
-    std::array<int, 4> nexhole = next_holes(s, r);
     for (int i=0; i<3; ++i) {
         s.bikes[i] = s.bikes[i+1]
-            && nexhole[i+1] <= s.pos + s.speed
-            && nexhole[i] < s.pos + s.speed;
+            && nex_holes[i+1][s.pos] <= s.speed
+            && nex_holes[i][s.pos] < s.speed;
     }
     s.bikes[3] = false;
     s.pos += s.speed;
 }
 
-inline void down(State& s, GameParams::Road& r) {
+inline void down(State& s) {
     if (s.bikes[3]) return;
 
-    std::array<int, 4> nexhole = next_holes(s, r);
     for (int i=3; i>0; --i) {
         s.bikes[i] = s.bikes[i-1]
-            && nexhole[i-1] <= s.pos + s.speed
-            && nexhole[i] < s.pos + s.speed;
+            && nex_holes[i-1][s.pos] <= s.speed
+            && nex_holes[i][s.pos] < s.speed;
     }
     s.bikes[0] = false;
     s.pos += s.speed;
@@ -305,12 +307,12 @@ void Game::apply(const Action a, State& st) {
     ++pstate->turn;
 
     switch(a) {
-    case Action::Wait: return wait(*pstate, pparams->road);
-    case Action::Slow: return slow(*pstate, pparams->road);
-    case Action::Speed: return speed(*pstate, pparams->road);
-    case Action::Jump: return jump(*pstate, pparams->road);
-    case Action::Up: return up(*pstate, pparams->road);
-    case Action::Down: return down(*pstate, pparams->road);
+    case Action::Wait: return wait(*pstate);
+    case Action::Slow: return slow(*pstate);
+    case Action::Speed: return speed(*pstate);
+    case Action::Jump: return jump(*pstate);
+    case Action::Up: return up(*pstate);
+    case Action::Down: return down(*pstate);
     default: return;
     }
 }
@@ -331,8 +333,8 @@ class Solver {
         Status status{ Status::DepthReached };
         int depth_explored;
         int score{ std::numeric_limits<int>::min() };
-        bool operator<(const RootAction& o);
-        bool operator==(const RootAction& o) { return o.pv[0] == pv[0]; }
+        bool operator<(const RootAction& o) const { return o.score < score; }
+        bool operator==(const RootAction& o) const { return o.pv[0] == pv[0]; }
     };
     typedef std::vector<RootAction> RootActions;
     struct Stack {
@@ -343,14 +345,13 @@ class Solver {
         int score;
     };
 public:
-    static void init(int time_per_turn_ms) { time = time_per_turn_ms; }
     Solver(Game& g) :
         game{g}
     {
     }
+    void set_time_ms(int time) { time_in_ms = time; }
     Action get_next();
 private:
-    static int time;
     Game& game;
     RootActions ractions;
     std::array<Stack, Max_depth> stacks;
@@ -358,10 +359,12 @@ private:
     Status status;
     int explored_depth;
     int root_depth;
+    int time_in_ms;
+    std::chrono::time_point<std::chrono::steady_clock> start;
 
     void search();
     Status search(int depth, Stack* ss);
-    bool time_up();
+    bool time_up() { return (std::chrono::steady_clock::now() - start).count() > time_in_ms; }
     void backtrack();
     void apply(const RootAction& ra);
 };
@@ -489,61 +492,58 @@ Solver::Status Solver::search(int depth, Stack* ss) {
     return ret;
 }
 
+std::ostream& operator<<(std::ostream& out, const Action a) {
+    switch(a) {
+    case Action::Wait: return out << "Wait";
+    case Action::Slow: return out << "Slow";
+    case Action::Speed: return out << "Speed";
+    case Action::Jump: return out << "Jump";
+    case Action::Up: return out << "Up";
+    case Action::Down: return out << "Down";
+    default: return out << "None";
+    }
+}
+
 /**
  * Helper class representing either std::cin or some std::ifstream.
  */
 class Istream {
 public:
-    Istream() = default;
-
-    void set_file(const std::string& fn) {
-        ifs = std::make_optional(std::ifstream{ fn });
-    }
-
-    operator std::istream&() {
+    Istream(const std::string& fn = std::string()) :
+        ifs{ fn.empty() ? std::nullopt : std::make_optional(std::ifstream{fn}) }
+    {
+        std::ios_base::sync_with_stdio(false);
         if (ifs) {
-            return *ifs;
-        } else {
-            return std::cin;
+            std::cin.rdbuf(ifs->rdbuf());
         }
     }
-
     operator bool() {
-        if (ifs) {
-            return bool(*ifs);
-        }
-        return true;
+        return std::cin.good() && (!ifs || ifs->is_open());
     }
-
+    operator std::istream&() {
+        return std::cin;
+    }
 private:
     std::optional<std::ifstream> ifs;
 };
 
 int main(int argc, char *argv[])
 {
-    enum class Mode { Offline, Online };
-    Mode mode = argc < 2 ? Mode::Online : Mode::Offline;
-    Istream is;
+    Istream is{ argc > 1 ? argv[1] : std::string() };
 
-    if (mode == Mode::Online)
-        std::ios_base::sync_with_stdio(false);
-    if (mode == Mode::Offline) {
-        is.set_file(argv[1]);
-        if (!is) {
-            std::cerr << "Failed to open input file "
-                  << argv[1] << std::endl;
-            return EXIT_FAILURE;
-        }
+    if (argc > 1 && !is) {
+        std::cerr << "Failed to open "
+            << argv[1] << std::endl;
     }
 
     static constexpr int max_time_ms = 150;
     Game::init(is);
-    Solver::init(max_time_ms);
 
     State init_state = input_turn(is);
     Game game;
     game.set(init_state);
     Solver solver(game);
+    solver.set_time_ms(max_time_ms);
 
     auto action = solver.get_next();
 
