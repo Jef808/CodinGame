@@ -22,12 +22,13 @@ struct State {
     int turn{ 0 };
     State* prev;
 };
+typedef std::array<std::vector<Cell>, 4> Road;
 
 /**
  * The immutable part of the game.
  */
 struct Params {
-    typedef std::array<std::vector<Cell>, 4> Road;
+    //typedef std::array<std::vector<Cell>, 4> Road;
     Road road;
     int start_bikes;
     int min_bikes;
@@ -35,13 +36,13 @@ struct Params {
 
 extern Params params;
 
-// namespace viewer{
-// template<typename R, typename S>
-// class ExtRoad;
+namespace viewer{
+template<typename R, typename S>
+class ExtRoad;
 
-// template<typename E, typename G>
-// class Viewer;
-// }
+template<typename R, typename S, typename G>
+class Viewer;
+}
 
 /**
  * Class implementing the game simulation.
@@ -67,12 +68,12 @@ public:
     //bool win_past_all_holes() const;
     const std::vector<Action>& candidates() const;
 
-    //void view(std::ostream&, const std::vector<Action>&) const;
+    void view(std::ostream&, const std::vector<Action>&);
 private:
     State* pstate;
     Params* const pparams = &tb::params;
-    //void apply(const Action a);
-    //friend class viewer::Viewer<viewer::ExtRoad<Params::Road, State>, Game>;
+    void apply(const Action a);
+    friend class viewer::Viewer<Road, State, Game>;
 };
 
 inline bool Game::is_won() const {
@@ -83,9 +84,9 @@ inline Key Game::key() const {
     return pstate->key;
 }
 
-} // namespace tb
+extern std::ostream& operator<<(std::ostream& out, const Action a);
 
-extern std::ostream& operator<<(std::ostream& out, const tb::Action a);
+} // namespace tb
 
 
 

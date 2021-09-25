@@ -16,7 +16,7 @@ Params params;
 
 namespace {
 
-    std::array<std::vector<int>, 4> nex_holes;
+  std::array<std::vector<int>, 4> nex_holes;
  /**
  * Compute and store the distance from each position to its next hole.
  * This is needed for the move simulations.
@@ -86,11 +86,6 @@ void Game::init(std::istream& _in)
     for (int i = 0; i < 50; ++i)
         Zobrist::key_speed[i] = dist(eng);
 }
-
-// size_t Game::hole_dist(size_t lane, size_t pos) const
-// {
-//     return nex_holes[lane][pos];
-// }
 
 void Game::set(State& st)
 {
@@ -191,32 +186,6 @@ void Game::apply(const Action a, State& st)
     st.key ^= Zobrist::get_key_bikes(*pstate);
 }
 
-// void Game::apply(const Action a)
-// {
-//     switch (a) {
-//     case Action::Wait:
-//         wait(*pstate);
-//         break;
-//     case Action::Slow:
-//         slow(*pstate);
-//         break;
-//     case Action::Speed:
-//         speed(*pstate);
-//         break;
-//     case Action::Jump:
-//         jump(*pstate);
-//         break;
-//     case Action::Up:
-//         up(*pstate);
-//         break;
-//     case Action::Down:
-//         down(*pstate);
-//         break;
-//     default:
-//         break;
-//     }
-// }
-
 void Game::undo()
 {
     assert(pstate->prev != nullptr);
@@ -315,36 +284,33 @@ const std::vector<Action>& Game::candidates() const
     return cands;
 }
 
-// void Game::view(std::ostream& out, const std::vector<Action>& actions) const {
-//     viewer::ExtRoad<Params::Road, State> xroad;
-//     xroad.init(params.road);
-//     viewer::Viewer v(xroad, *this);
+std::ostream& operator<<(std::ostream& out, const tb::Action a)
+{
+    using tb::Action;
+    switch (a) {
+    case Action::Wait:
+        return out << "Wait";
+    case Action::Slow:
+        return out << "Slow";
+    case Action::Speed:
+        return out << "Speed";
+    case Action::Jump:
+        return out << "Jump";
+    case Action::Up:
+        return out << "Up";
+    case Action::Down:
+        return out << "Down";
+    default:
+        return out << "None";
+    }
+}
 
-//     v.view(out, actions.begin(), actions.end());
-// }
+void Game::view(std::ostream& out, const std::vector<Action>& actions) {
+    //viewer::ExtRoad<Road, State> xroad;
+    viewer::Viewer<Road, State, Game> v( params.road, *pstate, *this );
 
-
+    v.view(out, actions.begin(), actions.end());
+}
 
 
 } // namespace tb
-
-// std::ostream& operator<<(std::ostream& out, const tb::Action a)
-// {
-//     using tb::Action;
-//     switch (a) {
-//     case Action::Wait:
-//         return out << "Wait";
-//     case Action::Slow:
-//         return out << "Slow";
-//     case Action::Speed:
-//         return out << "Speed";
-//     case Action::Jump:
-//         return out << "Jump";
-//     case Action::Up:
-//         return out << "Up";
-//     case Action::Down:
-//         return out << "Down";
-//     default:
-//         return out << "None";
-//     }
-// }

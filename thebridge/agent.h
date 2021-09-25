@@ -11,6 +11,7 @@ public:
     Agent(Game& g) :
         game{g} { }
 
+    void init(size_t pow2);
     void set_time_lim(int tl) { time_limit = tl; }
     Action get_next();
 

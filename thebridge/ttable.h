@@ -3,8 +3,8 @@
 
 #include "types.h"
 
-namespace tb {
 
+namespace tb {
     /// 6 bytes TT entry
     struct TTEntry {
         Action action() const { return (Action)action8; }
@@ -56,6 +56,7 @@ namespace tb {
         ~TranspositionTable() { free(mem); }
 
         void resize(size_t mb_size);
+        void resize2(size_t pow2);
         void clear();
 
         // Return true and a pointer to the entry if found, otherwise
@@ -77,8 +78,10 @@ namespace tb {
     };
 
 
+
 extern TranspositionTable TT;
 
-} // namespace tb
+} // namespace
+
 
 #endif // TTABLE_H_

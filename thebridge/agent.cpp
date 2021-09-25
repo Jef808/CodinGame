@@ -6,6 +6,7 @@
 #include <cassert>
 #include <chrono>
 #include <deque>
+#include <iostream>
 
 namespace tb {
 
@@ -19,8 +20,12 @@ namespace {
         void set_limit(int lim_ms) { limit = lim_ms; }
         void start() { m_start = Clock::now(); }
         bool out() {
-            return std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - m_start).count()
-                < limit;
+            auto ret = std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - m_start).count()
+                > limit;
+            if (ret) std::cerr << "Time out after "
+                         << std::chrono::duration<double>(Clock::now() - m_start).count()
+                         << " Seconds" << std::endl;
+            return ret;
         }
 
         Point m_start;
@@ -36,6 +41,9 @@ namespace {
         {}
         Action action;
         Value value{ -Value::Infinite };
+        bool operator==(const RootAction& ra) {
+            return ra.action == action;
+        }
     };
 
     typedef std::vector<RootAction> RootActions;
@@ -48,6 +56,11 @@ namespace {
 
 } // namespace
 
+void Agent::init(size_t pow2) {
+    // Reserve enough space to store all the state in
+    // the transposition table
+    TT.resize(pow2);
+}
 
 // If we used "Speed" or "Slow", we shouldn't use the other one
 // before "Jump", "Up" or "Down"
@@ -79,6 +92,11 @@ Value Score(Game& g) {
 }
 
 Action Agent::get_next() {
+    Time.set_limit(time_limit);
+    Time.start();
+
+    if (game.is_won())
+        return Action::None;
 
     const auto& actions = game.candidates();
     RootActions ractions;
@@ -94,7 +112,23 @@ Action Agent::get_next() {
     RootAction best_raction = RootAction{Action::None};
     Value best_value = -Value::Infinite;
 
-    for (int i=0; i<10; ++i) {
+    TTEntry* tte;
+    bool tt_found;
+    TT.probe(game.key(), tt_found);
+
+    if (tt_found) {
+        auto it = std::find_if(ractions.begin(), ractions.end(), [&](auto ra){
+            return ra.action == tte->action();
+        });
+        if (it != ractions.end()) {
+            std::swap(ractions[0], *it);
+            best_raction = ractions[0];
+            best_value = ractions[0].value;
+        }
+    }
+
+    while (!Time.out())
+    {
         int depth = depth_completed + 1;
 
         for (auto& ra : ractions) {
@@ -134,28 +168,29 @@ namespace {
         State st;
         g.apply(a, st);
 
-
         auto [win, loss] = std::make_pair(g.is_won(), g.is_lost());
+
         if (win) {
             Value ret = Value::Known_win;
             g.undo();
             return ret;
-        } else if (loss) {
+        }
+        else if (loss) {
             Value ret = Value::Known_loss;
             g.undo();
             return ret;
         }
 
+        // depth == 0 means it is beyond the TTEntries
         if (depth == 0) {
             Value ret = Score(g);
             g.undo();
             return ret;
         }
 
-        // Didn't need to record the action for depth 0.
         ActionHistory.push_back(a);
 
-        // Need to allocate space for this outside of the function
+        // TODO: Need to allocate space for this outside of the function
         std::array<Action, Max_actions> actions;
         std::fill(actions.begin(), actions.end(), Action::None);
 
@@ -164,8 +199,10 @@ namespace {
 
         // Exclude the bad choice
         auto it = std::find(actions.begin(), actions.end(), excluded());
-        *it = Action::None;
+        if (it != actions.end())
+            *it = Action::None;
 
+        // If that was the only left, we're on a stupid path
         if (cands.size() == 1 && cands[0] == excluded()) {
             Value val = Value(-5000);
             g.undo();
@@ -175,6 +212,19 @@ namespace {
 
         Value best_value = -Value::Infinite;
         Action best_action = Action::None;
+
+        TTEntry* tte;
+        bool tt_found;
+        TT.probe(g.key(), tt_found);
+
+        if (tt_found) {
+            auto it = std::find(actions.begin(), actions.end(), tte->action());
+            if (it != actions.end())
+                std::swap(actions[0], *it);
+            best_action = actions[0];
+            best_value = tte->value();
+        }
+
         for (auto a : actions) {
             if (a == Action::None)
                 continue;
@@ -183,6 +233,7 @@ namespace {
                 continue;
             if (val == Value::Known_win) {
                 best_value = val;
+                best_action = a;
                 break;
             }
             if (val > best_value) {
@@ -190,6 +241,12 @@ namespace {
                 best_action = a;
             }
         }
+
+        // Update the ttEntry in case it was found but has been beaten
+        if (tt_found && tte->action() != best_action) {
+            tte->save(g.key(), best_value, depth, best_action);
+        }
+
         g.undo();
         ActionHistory.pop_back();
         return best_value;

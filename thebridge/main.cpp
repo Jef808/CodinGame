@@ -61,25 +61,35 @@ private:
 
 using namespace tb::viewer;
 
-std::ostream& operator<<(std::ostream& out, const tb::Action a)
-{
-    using tb::Action;
-    switch (a) {
-    case Action::Wait:
-        return out << "Wait";
-    case Action::Slow:
-        return out << "Slow";
-    case Action::Speed:
-        return out << "Speed";
-    case Action::Jump:
-        return out << "Jump";
-    case Action::Up:
-        return out << "Up";
-    case Action::Down:
-        return out << "Down";
-    default:
-        return out << "None";
+// std::ostream& operator<<(std::ostream& out, const Action a)
+// {
+//     using tb::Action;
+//     switch (a) {
+//     case Action::Wait:
+//         return out << "Wait";
+//     case Action::Slow:
+//         return out << "Slow";
+//     case Action::Speed:
+//         return out << "Speed";
+//     case Action::Jump:
+//         return out << "Jump";
+//     case Action::Up:
+//         return out << "Up";
+//     case Action::Down:
+//         return out << "Down";
+//     default:
+//         return out << "None";
+//     }
+// }
+
+std::ostream& operator<<(std::ostream& out, const ExtCell c) {
+    switch(c) {
+    case ExtCell::Bridge : out << '-'; break;
+    case ExtCell::Hole   : out << '0'; break;
+    case ExtCell::Bike_bridge : out << 'B'; break;
+    case ExtCell::Bike_hole : out << 'X'; break;
     }
+    return out;
 }
 
 int main(int argc, char *argv[])
@@ -94,24 +104,26 @@ int main(int argc, char *argv[])
     static constexpr int max_time_ms = 150;
     Game::init(is);
     State init_state = input_turn(is);
-    State state_cpy = init_state;
-
     Game game;
+    Agent agent(game);
+
+    // Could close the file here really
     game.set(init_state);
 
-    Agent agent(game);
     agent.set_time_lim(max_time_ms);
-    auto action = agent.get_next();
+    agent.init(20);     // Save 32mb for the transposition table
 
+    auto action = agent.get_next();
     std::vector<Action> history;
-    history.push_back(action);
 
     while (action != Action::None) {
         std::cout << action << std::endl;
+        history.push_back(action);
         input_turn_ignore(is);
         action = agent.get_next();
     }
 
+    //game.set(state_cpy);
     //game.view(std::cout, history);
 
     return 0;

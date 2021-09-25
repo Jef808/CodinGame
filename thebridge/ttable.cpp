@@ -1,6 +1,8 @@
 #include "ttable.h"
-#include <iostream>
 
+#include <cmath>
+#include <cstring>
+#include <iostream>
 
 namespace tb {
 
@@ -18,35 +20,34 @@ size_t msb(size_t s) {
 
 } // namespace
 
-
-/**
- * NOTE: With small state spaces as in thebridge, we can actually save every single state
- * in the transposition table for very little memory:
- *
- * #states = 500*50*16 = 400000 and cluster_size = 5. So with new_cluster_count = 80000,
- * we get enough room for every state and the required memory in mb is about 2.44mb
- */
-void TranspositionTable::resize(size_t mb_size) {
-    // i.e. How many bits does it take to cover the range [0, ..., mb_size * 1024 * 1024] / sizeof(Cluster) ?
-    // ---> Look at log in base 2 and round up.
-    size_t new_cluster_count = size_t(1) << msb((mb_size * 1024 * 1024) / sizeof(Cluster));
+void TranspositionTable::resize(size_t power_of_two) {
+    size_t new_cluster_count = (size_t(1) << power_of_two);
 
     if (new_cluster_count == cluster_count) return;
-
     cluster_count = new_cluster_count;
 
     free(mem);
-    // NOTE: calloc zero-initializes the allocated memory.
-    mem = calloc(cluster_count * sizeof(Cluster) + CacheLineSize - 1, 1);
+    mem = calloc(1, cluster_count * sizeof(Cluster) + CacheLineSize - 1);
 
     if (!mem)
     {
-        std::cerr << "Failed to allocate " << mb_size
-                  << "MB for transposition table." << std::endl;
+        std::cerr << "Failed to allocate " << cluster_count
+                  << "clusters for transposition table" << std::endl;
         exit(EXIT_FAILURE);
+    }
+    else
+    {
+        std::cerr << "Allocated "
+                  << cluster_count * sizeof(Cluster) / 1024 / 1024
+            << " mb for transposition table" << std::endl;
     }
 
     table = (Cluster*)((uintptr_t(mem) + CacheLineSize - 1) & ~(CacheLineSize - 1));
+}
+
+// Overwrites the TranspositionTable with zeros.
+void TranspositionTable::clear() {
+    std::memset(table, 0, cluster_count * sizeof(Cluster));
 }
 
 TTEntry* TranspositionTable::probe(const Key key, bool& found) const {
@@ -65,6 +66,5 @@ TTEntry* TranspositionTable::probe(const Key key, bool& found) const {
             replace = &tte[i];
     return found = false, replace;
 }
-
 
 } // namespace tb
