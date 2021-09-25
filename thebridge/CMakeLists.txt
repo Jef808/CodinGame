@@ -7,7 +7,10 @@ set( CMAKE_CXX_STANDARD_REQUIRED 17 )
 set( CMAKE_BUILD_TYPE debug )
 
 set( SOURCES
+  main.cpp
   tb.cpp
+  ttable.cpp
+  agent.cpp
   )
 
 add_executable( tb ${SOURCES} )
