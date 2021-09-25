@@ -11,6 +11,9 @@ constexpr size_t Max_length = 500;
 constexpr size_t Max_depth = 50;
 constexpr size_t Max_actions = 6;
 
+enum class Cell { Bridge, Hole };
+//typedef std::array<std::vector<Cell>, 4> Road;
+
 enum class Action {
     None=0, Speed=1, Jump=2, Up=3, Down=4, Slow=5, Wait=6
 };

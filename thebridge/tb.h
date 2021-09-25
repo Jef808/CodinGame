@@ -19,7 +19,7 @@ struct State {
     size_t pos;
     size_t speed;
     std::array<bool, 4> bikes{ 0, 0, 0, 0 };
-    int turn;
+    int turn{ 0 };
     State* prev;
 };
 
@@ -27,7 +27,6 @@ struct State {
  * The immutable part of the game.
  */
 struct Params {
-    enum class Cell { Bridge, Hole };
     typedef std::array<std::vector<Cell>, 4> Road;
     Road road;
     int start_bikes;
@@ -35,6 +34,14 @@ struct Params {
 };
 
 extern Params params;
+
+// namespace viewer{
+// template<typename R, typename S>
+// class ExtRoad;
+
+// template<typename E, typename G>
+// class Viewer;
+// }
 
 /**
  * Class implementing the game simulation.
@@ -54,17 +61,22 @@ public:
     uint32_t key() const;
     int turn() const { return pstate->turn; }
     int pos() const { return pstate->pos; }
-    size_t hole_dist(size_t lane, size_t pos) const;
-    bool win_past_all_holes() const;
+    size_t road_length() const { return pparams->road.size(); }
+    int ratio_bikes_left() const;
+    //size_t hole_dist(size_t lane, size_t pos) const;
+    //bool win_past_all_holes() const;
     const std::vector<Action>& candidates() const;
 
+    //void view(std::ostream&, const std::vector<Action>&) const;
 private:
     State* pstate;
     Params* const pparams = &tb::params;
+    //void apply(const Action a);
+    //friend class viewer::Viewer<viewer::ExtRoad<Params::Road, State>, Game>;
 };
 
 inline bool Game::is_won() const {
-    return pstate->pos >= pparams->road[0].size();
+    return pstate->pos >= pparams->road[0].size() && !(is_lost());
 }
 
 inline Key Game::key() const {

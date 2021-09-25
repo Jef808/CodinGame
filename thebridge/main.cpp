@@ -7,12 +7,14 @@
 #include "agent.h"
 #include "types.h"
 
+#include "viewer.h"
+
 using namespace tb;
 
 
 State input_turn(std::istream& _in) {
     State state;
-    std::stringstream ss{};
+    //std::stringstream ss{};
     int x, y, a;  // x-coord, y-coord, active-or-not
     _in >> state.speed; _in.ignore();
 
@@ -20,8 +22,8 @@ State input_turn(std::istream& _in) {
     {
         _in >> x >> y >> a; _in.ignore();
 
-        ss << x << ' ' << y << ' ' << a << std::endl;
-        state.bikes[i] = (a == '1');
+        //ss << x << ' ' << y << ' ' << a << std::endl;
+        state.bikes[i] = (a == 1);
     }
     state.pos = x;
     return state;
@@ -57,6 +59,28 @@ private:
     std::optional<std::ifstream> ifs;
 };
 
+using namespace tb::viewer;
+
+std::ostream& operator<<(std::ostream& out, const tb::Action a)
+{
+    using tb::Action;
+    switch (a) {
+    case Action::Wait:
+        return out << "Wait";
+    case Action::Slow:
+        return out << "Slow";
+    case Action::Speed:
+        return out << "Speed";
+    case Action::Jump:
+        return out << "Jump";
+    case Action::Up:
+        return out << "Up";
+    case Action::Down:
+        return out << "Down";
+    default:
+        return out << "None";
+    }
+}
 
 int main(int argc, char *argv[])
 {
@@ -70,20 +94,25 @@ int main(int argc, char *argv[])
     static constexpr int max_time_ms = 150;
     Game::init(is);
     State init_state = input_turn(is);
+    State state_cpy = init_state;
 
     Game game;
     game.set(init_state);
 
     Agent agent(game);
     agent.set_time_lim(max_time_ms);
-
     auto action = agent.get_next();
+
+    std::vector<Action> history;
+    history.push_back(action);
 
     while (action != Action::None) {
         std::cout << action << std::endl;
         input_turn_ignore(is);
         action = agent.get_next();
     }
+
+    //game.view(std::cout, history);
 
     return 0;
 }

@@ -16,8 +16,7 @@ public:
 
 private:
     Game& game;
-
-    int depth_completed;
+    int depth_completed{ 0 };
     int time_limit;
 };
 
