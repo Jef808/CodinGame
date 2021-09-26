@@ -31,7 +31,7 @@ State input_turn(std::istream& _in) {
 
 void input_turn_ignore(std::istream& _in) {
     std::string buf;
-    for (int i=0; i<params.start_bikes; ++i) {
+    for (int i=0; i<params.start_bikes+1; ++i) {
         std::getline(_in, buf);
     }
 }
@@ -59,38 +59,6 @@ private:
     std::optional<std::ifstream> ifs;
 };
 
-using namespace tb::viewer;
-
-// std::ostream& operator<<(std::ostream& out, const Action a)
-// {
-//     using tb::Action;
-//     switch (a) {
-//     case Action::Wait:
-//         return out << "Wait";
-//     case Action::Slow:
-//         return out << "Slow";
-//     case Action::Speed:
-//         return out << "Speed";
-//     case Action::Jump:
-//         return out << "Jump";
-//     case Action::Up:
-//         return out << "Up";
-//     case Action::Down:
-//         return out << "Down";
-//     default:
-//         return out << "None";
-//     }
-// }
-
-std::ostream& operator<<(std::ostream& out, const ExtCell c) {
-    switch(c) {
-    case ExtCell::Bridge : out << '-'; break;
-    case ExtCell::Hole   : out << '0'; break;
-    case ExtCell::Bike_bridge : out << 'B'; break;
-    case ExtCell::Bike_hole : out << 'X'; break;
-    }
-    return out;
-}
 
 int main(int argc, char *argv[])
 {
@@ -102,10 +70,10 @@ int main(int argc, char *argv[])
     }
 
     static constexpr int max_time_ms = 150;
-    Game::init(is);
-    State init_state = input_turn(is);
     Game game;
     Agent agent(game);
+    Game::init(is);
+    State init_state = input_turn(is);
 
     // Could close the file here really
     game.set(init_state);
@@ -114,17 +82,12 @@ int main(int argc, char *argv[])
     agent.init(20);     // Save 32mb for the transposition table
 
     auto action = agent.get_next();
-    std::vector<Action> history;
 
     while (action != Action::None) {
         std::cout << action << std::endl;
-        history.push_back(action);
         input_turn_ignore(is);
         action = agent.get_next();
     }
-
-    //game.set(state_cpy);
-    //game.view(std::cout, history);
 
     return 0;
 }

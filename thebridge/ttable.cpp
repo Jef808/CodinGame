@@ -11,8 +11,7 @@ TranspositionTable TT;
 namespace {
 
 /**
- * Return the number of leading 0s starting from the most
- * significant bit set.
+ * FIXME: Why doesn't the formula used by Stockfish work?
 */
 size_t msb(size_t s) {
   return __builtin_clzll(s);

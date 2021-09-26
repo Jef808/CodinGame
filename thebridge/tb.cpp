@@ -72,6 +72,10 @@ void Game::init(std::istream& _in)
         std::getline(_in, buf);
         std::transform(buf.begin(), buf.end(), std::back_inserter(params.road[i]),
             [](const auto c) { return c == '0' ? Cell::Hole : Cell::Bridge; });
+        // Extend the road for safety.
+        for (int j = 0; j<10; ++j) {
+            params.road[i].push_back(Cell::Bridge);
+        }
     }
 
     nex_holes_dists();
@@ -104,22 +108,22 @@ inline void wait(State& s)
 
 inline void slow(State& s)
 {
-    --s.speed;
     s.key ^= (Zobrist::key_speed[s.speed] ^ Zobrist::key_speed[s.speed - 1]);
+    --s.speed;
     wait(s);
 }
 
 inline void speed(State& s)
 {
-    ++s.speed;
     s.key ^= (Zobrist::key_speed[s.speed] ^ Zobrist::key_speed[s.speed + 1]);
+    ++s.speed;
     wait(s);
 }
 
 inline void jump(State& s)
 {
     for (int i = 0; i < 4; ++i) {
-        s.bikes[i] &= nex_holes[i][s.pos] != s.speed;
+        s.bikes[i] &= params.road[i][s.pos+s.speed] != Cell::Hole;
     }
     s.pos += s.speed;
 }
@@ -131,8 +135,8 @@ inline void up(State& s)
 
     for (int i = 0; i < 3; ++i) {
         s.bikes[i] = s.bikes[i + 1]
-            && nex_holes[i + 1][s.pos] > s.speed
-            && nex_holes[i][s.pos] >= s.speed;
+            && nex_holes[i + 1][s.pos] >= s.speed
+            && nex_holes[i][s.pos] > s.speed;
     }
     s.bikes[3] = false;
     s.pos += s.speed;
@@ -145,8 +149,8 @@ inline void down(State& s)
 
     for (int i = 3; i > 0; --i) {
         s.bikes[i] = s.bikes[i - 1]
-            && nex_holes[i - 1][s.pos] > s.speed
-            && nex_holes[i][s.pos] >= s.speed;
+            && nex_holes[i - 1][s.pos] >= s.speed
+            && nex_holes[i][s.pos] > s.speed;
     }
     s.bikes[0] = false;
     s.pos += s.speed;
@@ -214,31 +218,18 @@ const std::vector<Action>& Game::candidates() const
     size_t p = pstate->pos;
     size_t s = pstate->speed;
 
+    if (s == 0) {
+        cands.push_back(Action::Speed);
+        return cands;
+    }
+
     auto is_cand = [](Action a) {
         return std::find(cands.begin(), cands.end(), a) != cands.end();
     };
     int max_deaths = n_bikes(*pstate) - params.min_bikes;
-    // Slow
-    int n_deaths = 0;
-    if (s > 0) {
-        for (int i = 0; i < 4; ++i) {
-            n_deaths += pstate->bikes[i] && nex_holes[i][p] < s;
-        }
-        if (n_deaths <= max_deaths)
-            cands.push_back(Action::Slow);
-    }
-    // Wait
-    n_deaths = 0;
-    if (is_cand(Action::Slow)) {
-        for (int i = 0; i < 4; ++i) {
-            n_deaths += pstate->bikes[i] && nex_holes[i][p] <= s;
-        }
-        if (n_deaths <= max_deaths)
-            cands.push_back(Action::Wait);
-    }
     // Speed
-    n_deaths = 0;
-    if (is_cand(Action::Wait) && pstate->speed < 50) {
+    int n_deaths = 0;
+    if (pstate->speed < 50) {
         for (int i = 0; i < 4; ++i) {
             n_deaths = pstate->bikes[i] && (nex_holes[i][p] <= s + 1);
         }
@@ -247,18 +238,25 @@ const std::vector<Action>& Game::candidates() const
     }
     // Jump
     n_deaths = 0;
-    if (!is_cand(Action::Wait)) {
+    for (int i = 0; i < 4; ++i) {
+        n_deaths += pstate->bikes[i] && (params.road[i][p+s] == Cell::Hole);
+    }
+    if (n_deaths <= max_deaths)
+        cands.push_back(Action::Jump);
+    // Slow
+    n_deaths = 0;
+    if (s > 0) {
         for (int i = 0; i < 4; ++i) {
-            n_deaths += pstate->bikes[i] && (nex_holes[i][p] == s);
+            n_deaths += pstate->bikes[i] && (nex_holes[i][p] < s);
         }
         if (n_deaths <= max_deaths)
-            cands.push_back(Action::Jump);
+            cands.push_back(Action::Slow);
     }
     // Up
     n_deaths = 0;
     if (!pstate->bikes[0]) {
         for (int i = 1; i < 4; ++i) {
-            n_deaths += pstate->bikes[i] && (nex_holes[i][p] < s || nex_holes[i - 1][p] <= s);
+            n_deaths += (pstate->bikes[i] && (nex_holes[i][p] < s || nex_holes[i - 1][p] <= s));
         }
         if (n_deaths <= max_deaths)
             cands.push_back(Action::Up);
@@ -272,15 +270,9 @@ const std::vector<Action>& Game::candidates() const
         if (n_deaths <= max_deaths)
             cands.push_back(Action::Down);
     }
-    // Reorder Slow/Wait/Speed
-    if (is_cand(Action::Speed))
-        std::swap(cands[0], cands[2]);
-    else if (is_cand(Action::Wait))
-        std::swap(cands[0], cands[1]);
     // Mix up Up / Down
     if (is_cand(Action::Up) && is_cand(Action::Down) && rand() % 2)
         std::swap(cands[cands.size()-1], cands[cands.size()-2]);
-    // Note that Jump is always first when it's possible
     return cands;
 }
 
@@ -289,19 +281,19 @@ std::ostream& operator<<(std::ostream& out, const tb::Action a)
     using tb::Action;
     switch (a) {
     case Action::Wait:
-        return out << "Wait";
+        return out << "WAIT";
     case Action::Slow:
-        return out << "Slow";
+        return out << "SLOW";
     case Action::Speed:
-        return out << "Speed";
+        return out << "SPEED";
     case Action::Jump:
-        return out << "Jump";
+        return out << "JUMP";
     case Action::Up:
-        return out << "Up";
+        return out << "UP";
     case Action::Down:
-        return out << "Down";
+        return out << "DOWN";
     default:
-        return out << "None";
+        return out << "NONE";
     }
 }
 
