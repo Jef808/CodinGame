@@ -32,15 +32,33 @@ std::underlying_type_t<Enum> to_int(Enum e) {
 typedef uint32_t Key;
 
 enum class Value : int {
-    Known_loss = -10000,
-    Zero = 0,
-    Known_win = 10000,
+    Known_loss = 10000,
+    Known_win = 0,
+    Max = 270,
     Infinite = 32000
 };
 
-/** Score for being at position p after t turns. */
-inline Value Score(size_t p, size_t t) {
-    return Value(p - (Max_length / Max_depth) * t);
+enum class Cost : int {
+    Known_loss = 10000,
+    Known_win = 0,
+    Max = 270,
+    Infinite = 32000
+};
+
+inline Cost operator+(const Cost c, const int i) {
+    return Cost(to_int(c) + i);
+}
+
+inline Cost operator+(const Cost c, const Cost i) {
+    return c + to_int(i);
+}
+
+inline Cost& operator+=(Cost& c, const Cost i) {
+    return c = c + i;
+}
+
+inline Cost& operator+=(Cost& c, const int i) {
+    return c = c + i;
 }
 
 inline Value operator-(const Value v) {
