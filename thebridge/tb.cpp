@@ -8,7 +8,6 @@
 
 #include "tb.h"
 #include "types.h"
-#include "viewer.h"
 
 namespace tb {
 
@@ -99,6 +98,15 @@ void Game::set(State& st)
     pstate->key = key;
 }
 
+void Game::set(State& st, Agent* ag)
+{
+    assert(pstate != &st);
+    pstate = &st;
+    Key key = Zobrist::get(*pstate);
+    pstate->key = key;
+    phandling_agent = ag;
+}
+
 inline void wait(State& s)
 {
     for (int i = 0; i < 4; ++i)
@@ -158,6 +166,9 @@ inline void down(State& s)
 
 void Game::apply(const Action a, State& st)
 {
+    assert(pstate->turn >= 0 && pstate->turn < 50);
+    assert(pstate->pos >= 0 && pstate->pos <=params.road[0].size());
+
     st = *pstate;
     st.prev = pstate;
     pstate = &st;
@@ -196,19 +207,74 @@ void Game::undo()
     pstate = pstate->prev;
 }
 
-int n_bikes(const State& st)
+int Game::n_bikes() const
 {
-    return std::count(st.bikes.begin(), st.bikes.end(), true);
+    return std::count(pstate->bikes.begin(), pstate->bikes.end(), true);
 }
 
 bool Game::is_lost() const
 {
-    return pstate->turn > 50 || n_bikes(*pstate) < params.min_bikes;
+    return pstate->turn > 50 || n_bikes() < params.min_bikes;
 }
 
 int Game::ratio_bikes_left() const
 {
-    return 500 * (n_bikes(*pstate) - pparams->min_bikes + 1) / (pparams->start_bikes - pparams->min_bikes + 1) - 250;
+    return 500 * (n_bikes() - pparams->min_bikes + 1) / (pparams->start_bikes - pparams->min_bikes + 1) - 250;
+}
+
+int n_conseq_holes() {
+    int n = 0;
+    for (int i=0; i<4; ++i)
+    {
+        auto h = std::find(params.road[i].begin(), params.road[i].end(), Cell::Hole);
+
+        if (h == params.road[i].end())
+            return n;
+
+        auto j = std::find(h, params.road[i].end(), Cell::Bridge);
+        if (j == params.road[i].end())
+            return n;
+
+        int m = std::distance(h, j);
+        n = m > n ? m : n;
+    }
+
+    return n;
+}
+
+std::array<Action, 5> Game::candidates1() const
+{
+    static const int longest_jump = n_conseq_holes();
+    static std::array<Action, 5> actions {
+        Action::Speed, Action::Jump, Action::Up, Action::Down, Action::Slow
+    };
+
+    std::array<Action, 5> ret;
+    ret.fill(Action::None);
+
+    // Speed is our first choice, but we cap the speed
+    // to mix up the candidates a little
+    if (pstate->speed < longest_jump + 1)
+        ret[0] = actions[0];
+
+    if (pstate->speed == 0) {
+        return ret;
+    }
+
+    // Jump
+    ret[1] = actions[1];
+
+    // Filter Up/Downs
+    if (!pstate->bikes[0])
+        ret[2] = actions[2];
+    if (!pstate->bikes[3])
+        ret[3] = actions[3];
+
+    // Slow
+    if (pstate->speed > 1)
+        ret[4] = actions[4];
+
+    return ret;
 }
 
 const std::vector<Action>& Game::candidates() const
@@ -226,7 +292,7 @@ const std::vector<Action>& Game::candidates() const
     auto is_cand = [](Action a) {
         return std::find(cands.begin(), cands.end(), a) != cands.end();
     };
-    int max_deaths = n_bikes(*pstate) - params.min_bikes;
+    int max_deaths = n_bikes() - params.min_bikes;
     // Speed
     int n_deaths = 0;
     if (pstate->speed < 50) {
@@ -295,13 +361,6 @@ std::ostream& operator<<(std::ostream& out, const tb::Action a)
     default:
         return out << "NONE";
     }
-}
-
-void Game::view(std::ostream& out, const std::vector<Action>& actions) {
-    //viewer::ExtRoad<Road, State> xroad;
-    viewer::Viewer<Road, State, Game> v( params.road, *pstate, *this );
-
-    v.view(out, actions.begin(), actions.end());
 }
 
 

@@ -28,7 +28,6 @@ typedef std::array<std::vector<Cell>, 4> Road;
  * The immutable part of the game.
  */
 struct Params {
-    //typedef std::array<std::vector<Cell>, 4> Road;
     Road road;
     int start_bikes;
     int min_bikes;
@@ -36,13 +35,7 @@ struct Params {
 
 extern Params params;
 
-namespace viewer{
-template<typename R, typename S>
-class ExtRoad;
-
-template<typename R, typename S, typename G>
-class Viewer;
-}
+class Agent;
 
 /**
  * Class implementing the game simulation.
@@ -54,7 +47,8 @@ public:
 
     static void init(std::istream&);
     Game() = default;
-    void set(State& st);
+    void set(State&);
+    void set(State&, Agent*);
     void apply(const Action a, State& st);
     void undo();
     bool is_won() const;
@@ -62,18 +56,23 @@ public:
     uint32_t key() const;
     int turn() const { return pstate->turn; }
     int pos() const { return pstate->pos; }
-    size_t road_length() const { return pparams->road.size(); }
+    size_t get_speed() const { return pstate->speed; }
+    size_t road_length() const { return pparams->road[0].size(); }
+    int n_bikes() const;
+    size_t n_bikes_start() const { return pparams->start_bikes; }
     int ratio_bikes_left() const;
     //size_t hole_dist(size_t lane, size_t pos) const;
     //bool win_past_all_holes() const;
+    Params const* parameters() const { return pparams; }
+    Agent* handling_agent() const { return phandling_agent; }
+    std::array<Action, 5> candidates1() const;
     const std::vector<Action>& candidates() const;
 
-    void view(std::ostream&, const std::vector<Action>&);
 private:
     State* pstate;
-    Params* const pparams = &tb::params;
+    Params * const pparams = &tb::params;
+    Agent* phandling_agent;
     void apply(const Action a);
-    friend class viewer::Viewer<Road, State, Game>;
 };
 
 inline bool Game::is_won() const {

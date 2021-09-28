@@ -9,15 +9,16 @@ struct Timer {
     Timer() = default;
     void set_limit(int lim_ms) { limit = lim_ms; }
     void reset() { m_start = Clock::now(); }
-    Duration elapsed_time();
+    Duration elapsed();
     bool out();
 
     Point m_start { Clock::now() };
     int limit { std::numeric_limits<int>::max() };
+    bool warning_sent { false };
 };
 
 
-inline Timer::Duration Timer::elapsed_time() {
+inline Timer::Duration Timer::elapsed() {
     using std::chrono::duration_cast;
     using std::chrono::milliseconds;
     return duration_cast<milliseconds>(
@@ -25,16 +26,12 @@ inline Timer::Duration Timer::elapsed_time() {
 }
 
 inline bool Timer::out() {
-    if (limit == std::numeric_limits<int>::max())
+    if (limit == std::numeric_limits<int>::max() && !warning_sent)
     {
-        std::cerr << "WARNING: Timerr queried with unset time limit!"
+        warning_sent = true;
+        std::cerr << "Timer: Received timeout query but time limit is not set."
             << std::endl;
     }
-    bool ret = elapsed_time() > limit;
-    if (ret)
-    {
-        std::cerr << "Timer out after "
-            << elapsed_time() << " Seconds" << std::endl;
-    }
-    return ret;
+
+    return elapsed() > limit;
 }

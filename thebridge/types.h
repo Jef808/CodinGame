@@ -15,7 +15,7 @@ enum class Cell { Bridge, Hole };
 //typedef std::array<std::vector<Cell>, 4> Road;
 
 enum class Action {
-    None=0, Speed=1, Jump=2, Up=3, Down=4, Slow=5, Wait=6
+    None=0, Speed=1, Jump=2, Up=3, Down=4, Slow=5, Wait=6, Null=7
 };
 
 inline bool operator!(const Action a) {
@@ -31,22 +31,17 @@ std::underlying_type_t<Enum> to_int(Enum e) {
 
 typedef uint32_t Key;
 
-enum class Value : int {
-    Known_loss = 10000,
-    Known_win = 0,
-    Max = 270,
-    Infinite = 32000
-};
-
 enum class Cost : int {
-    Known_loss = 10000,
+    Zero = 0,
     Known_win = 0,
-    Max = 270,
-    Infinite = 32000
+    Unknown = 25,
+    Max = 50,
+    Known_loss = 51,
+    Infinite = 63
 };
 
 inline Cost operator+(const Cost c, const int i) {
-    return Cost(to_int(c) + i);
+    return Cost( to_int(c) + i );
 }
 
 inline Cost operator+(const Cost c, const Cost i) {
@@ -59,14 +54,6 @@ inline Cost& operator+=(Cost& c, const Cost i) {
 
 inline Cost& operator+=(Cost& c, const int i) {
     return c = c + i;
-}
-
-inline Value operator-(const Value v) {
-    return Value(-to_int(v));
-}
-
-inline bool operator<(const Value a, const Value b) {
-    return to_int(a) < to_int(b);
 }
 
 } // namespace tb
