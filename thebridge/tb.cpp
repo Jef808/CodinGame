@@ -4,6 +4,7 @@
 #include <iostream>
 #include <random>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "tb.h"
@@ -98,15 +99,6 @@ void Game::set(State& st)
     pstate->key = key;
 }
 
-void Game::set(State& st, Agent* ag)
-{
-    assert(pstate != &st);
-    pstate = &st;
-    Key key = Zobrist::get(*pstate);
-    pstate->key = key;
-    phandling_agent = ag;
-}
-
 inline void wait(State& s)
 {
     for (int i = 0; i < 4; ++i)
@@ -121,7 +113,7 @@ inline void slow(State& s)
     wait(s);
 }
 
-inline void speed(State& s)
+inline void speed_up(State& s)
 {
     s.key ^= (Zobrist::key_speed[s.speed] ^ Zobrist::key_speed[s.speed + 1]);
     ++s.speed;
@@ -164,17 +156,15 @@ inline void down(State& s)
     s.pos += s.speed;
 }
 
-void Game::apply(const Action a, State& st)
-{
-    assert(pstate->turn >= 0 && pstate->turn < 50);
-    assert(pstate->pos >= 0 && pstate->pos <=params.road[0].size());
+void Game::apply(State& s, Action a) {
+        
+    s = *pstate;
+    s.prev = pstate;
 
-    st = *pstate;
-    st.prev = pstate;
-    pstate = &st;
-    ++pstate->turn;
-    st.key ^= Zobrist::key_pos[pstate->pos];
-    st.key ^= Zobrist::get_key_bikes(*pstate);
+    apply(s, std::move(a));
+
+    pstate->key ^= Zobrist::key_pos[pstate->pos];
+    pstate->key ^= Zobrist::get_key_bikes(*pstate);
     switch (a) {
     case Action::Wait:
         wait(*pstate);
@@ -183,7 +173,7 @@ void Game::apply(const Action a, State& st)
         slow(*pstate);
         break;
     case Action::Speed:
-        speed(*pstate);
+        speed_up(*pstate);
         break;
     case Action::Jump:
         jump(*pstate);
@@ -197,8 +187,8 @@ void Game::apply(const Action a, State& st)
     default:
         break;
     }
-    st.key ^= Zobrist::key_pos[pstate->pos];
-    st.key ^= Zobrist::get_key_bikes(*pstate);
+    pstate->key ^= Zobrist::key_pos[pstate->pos];
+    pstate->key ^= Zobrist::get_key_bikes(*pstate);
 }
 
 void Game::undo()
@@ -210,16 +200,6 @@ void Game::undo()
 int Game::n_bikes() const
 {
     return std::count(pstate->bikes.begin(), pstate->bikes.end(), true);
-}
-
-bool Game::is_lost() const
-{
-    return pstate->turn > 50 || n_bikes() < params.min_bikes;
-}
-
-int Game::ratio_bikes_left() const
-{
-    return 500 * (n_bikes() - pparams->min_bikes + 1) / (pparams->start_bikes - pparams->min_bikes + 1) - 250;
 }
 
 int n_conseq_holes() {

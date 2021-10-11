@@ -4,6 +4,7 @@
 #include <array>
 #include <cassert>
 #include <iosfwd>
+#include <utility>
 #include <vector>
 
 #include "types.h"
@@ -48,8 +49,7 @@ public:
     static void init(std::istream&);
     Game() = default;
     void set(State&);
-    void set(State&, Agent*);
-    void apply(const Action a, State& st);
+    void apply(State&, Action a);
     void undo();
     bool is_won() const;
     bool is_lost() const;
@@ -72,11 +72,15 @@ private:
     State* pstate;
     Params * const pparams = &tb::params;
     Agent* phandling_agent;
-    void apply(const Action a);
 };
 
 inline bool Game::is_won() const {
-    return pstate->pos >= pparams->road[0].size() && !(is_lost());
+    return (pstate->pos >= pparams->road[0].size() && !(is_lost()));
+}
+
+inline bool Game::is_lost() const
+{
+    return pstate->turn > 50 || n_bikes() < params.min_bikes;
 }
 
 inline Key Game::key() const {

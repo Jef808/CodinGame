@@ -1,4 +1,4 @@
-cmake_minimum_required( VERSION 3.20 )
+cmake_minimum_required( VERSION 3.19 )
 project( The_bridge )
 
 set( CMAKE_EXPORT_COMPILE_COMMANDS on )
@@ -9,6 +9,7 @@ set( CMAKE_BUILD_TYPE debug )
 set( SOURCES
   tb.cpp
   agent.cpp
+  actionstack.cpp
   )
 
 add_executable( tb ${SOURCES} )

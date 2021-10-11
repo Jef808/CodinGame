@@ -1,41 +1,13 @@
 #include "agent.h"
+#include "actionstack.h"
 #include "tb.h"
 #include "types.h"
 
 #include <algorithm>
-#include <deque>
 #include <fstream>
 #include <iostream>
 
 namespace tb {
-
-struct VAction {
-    Action action;
-    Cost cost;
-    bool operator<(const VAction& va)
-    {
-        return cost < va.cost;
-    }
-    bool operator==(const Action a)
-    {
-        return action == a;
-    }
-    bool operator!=(const Action a)
-    {
-        return action != a;
-    }
-    bool operator!=(const VAction& va)
-    {
-        return action != va.action;
-    }
-};
-
-bool operator<(const VAction& va, const VAction& vb) {
-    return vb.cost < va.cost;
-}
-bool operator==(const VAction& va, const VAction& vb) {
-    return va.action == vb.action;
-}
 
 std::ostream& operator<<(std::ostream& _out, const VAction& va)
 {
@@ -44,17 +16,28 @@ std::ostream& operator<<(std::ostream& _out, const VAction& va)
 
 namespace {
 
-    std::array<Action, Max_depth + 1> sactions;
-    Action* pv { &sactions[1] };
+    using ActionList = std::array<VAction, Max_actions>;
 
-    std::array<State, Max_depth + 1> sstates;
+    ActionList sactions[Max_depth + 1];
+    ActionList* sa { &sactions[0] };
+    State sstates[Max_depth + 1];
     State* st { &sstates[1] };
-
-    std::deque<std::array<VAction, 5>> scands;
-    std::array<VAction, 5>* pcands { &scands[0] };
 
     const Params* game_params;
     Timer time;
+
+    void view_tree()
+    {
+        while (*sa->begin() != Action::None) {
+            for (const auto& va : *sa) {
+                if (va != Action::None)
+                    std::cout << "{ " << va.action << ' '
+                              << to_int(va.cost) << " }, ";
+                std::cout << '\n'
+                          << std::endl;
+            }
+        }
+    }
 
     /**
      * Read the turn input from the istream, updating the agent's
@@ -80,32 +63,18 @@ namespace {
         }
     }
 
-    Cost depth_first_search(Game& game, int depth, Cost cost_glb, bool& timeout);
+    void generate_actions(Game& game, int depth)
+    {
+        for (auto a : game.candidates1())
+            std::transform(game.candidates1().begin(), game.candidates1().end(), sactions[depth].begin(), [](auto a) {
+                Cost cost = a == Action::None ? Cost::Infinite : Cost::Unknown;
+                return VAction{ a, Cost(cost) };
+            });
+    }
+
+    Cost depth_first_search(Game& game, ActionList* sa,int depth, Cost cost_glb, bool& timeout);
 
 } // namespace
-
-void Agent::init()
-{
-    sstates.fill(State {});
-    sactions.fill(Action::None);
-}
-
-void populate_next_cands(Game& game)
-{
-    int _root_depth = game.handling_agent()->get_root_depth();
-
-    scands.push_back(std::array<VAction, 5> {});
-
-    const auto& game_cands = game.candidates1();
-
-    std::transform(game_cands.begin(), game_cands.end(), scands.back().begin(), [](auto a) {
-        Cost cost = a == Action::None ? Cost::Infinite : Cost::Unknown;
-        return VAction {
-            a,
-            cost,
-        };
-    });
-}
 
 void Agent::setup(std::istream& _in, std::ostream& _out, int timelim_ms, bool online)
 {
@@ -123,41 +92,35 @@ void Agent::setup(std::istream& _in, std::ostream& _out, int timelim_ms, bool on
     game_params = game.parameters();
 
     st = &sstates[1];
-    input_turn(*in, *(st-1), true);
-    game.set(*(st-1), this);
-
-    game_depth = 0;
+    input_turn(*in, *(st - 1), true);
+    game.set(*(st - 1));
     game_over = false;
+
+    std::for_each(&sactions[0], &sactions[Max_depth], [](auto& al){
+        al.fill(VAction{ Action::None, Cost::Unknown });
+    });
 }
 
-void Agent::play_turn()
+bool Agent::play_turn()
 {
-    Action a = Action::Jump;
-    if (scands.empty()) {
-        std::cerr << "play_turn() called with no candidates!"
-                  << "\n Outputting JUMP by default" << std::endl;
-    } else {
-        a = scands.front()[0].action;
-        scands.pop_front();
-    }
+    *out << (*sa++)[0] << std::endl;
 
-    *out << a << std::endl;
+    game.apply(*st++, (*sa)[0].action);
 
-    game.apply(a, *st++);
     game_over = game.is_lost() || game.is_won();
 
     if (game_over) {
         std::cerr << "Agent: game is "
                   << (game.is_lost() ? "lost!" : "won!")
                   << std::endl;
-    } else {
-        if (playing_online)
-            input_turn(*in, *st);
-        time.reset();
-
-        ++game_depth;
-        --root_depth;
+        return false;
     }
+    if (playing_online) {
+        input_turn(*in, *st);
+    }
+
+    time.reset();
+    return true;
 }
 
 /**
@@ -167,7 +130,7 @@ void Agent::play_turn()
 inline int turn_glb(const Game& g)
 {
     int t = 0;
-    while (t * (2*g.get_speed() + t + 1) < 2 * (g.road_length() - g.pos()))
+    while (t * (2 * g.get_speed() + t + 1) < 2 * (g.road_length() - g.pos()))
         ++t;
     return t;
 }
@@ -183,135 +146,163 @@ inline Cost eval(const Game& g)
 
 /**
  * Penalty of Cost::Max for loosing state, and
- * penalty of 5 turns for each bike lost.
+ * penalty of 5 turns for each bike lost. Add one for the
+ * cost of one turn.
  */
 Cost penalty(Game& g, Action a)
 {
     static const int& nb_min = game_params->min_bikes;
 
     int nb_prev = g.n_bikes();
-    State s;
-    g.apply(a, s);
+    g.apply(*st, std::move(a));
     g.undo();
     int nb_nex = g.n_bikes();
 
     return (nb_nex < nb_min || g.turn() > 50)
         ? Cost::Infinite
-        : Cost( 5 * (nb_nex - nb_prev) );
+        : Cost(1 + 5 * (nb_nex - nb_prev));
 }
 
 void Agent::solve()
 {
     time.reset();
-
     bool timeout = false;
     Cost best_cost = Cost::Infinite;
+
+    bool last_interrupted = false;
     Cost last_best_cost = Cost::Infinite;
     Action last_best_action = Action::None;
-    int last_best_depth = root_depth;
+    int last_best_depth = root_depth = 0;
+
     Cost cost_glb = Cost(turn_glb(game));
-    Cost delta = Cost(2);
 
-    depth_completed = root_depth = 0;
+    root_depth = 0;
+    int search_depth = 0;
 
-    while (root_depth < Max_depth) {
-
-        //std::array<VAction, Max_actions> prev_scores;
-        //std::copy(pcands->begin(), pcands->end(), prev_scores.begin());
-
-        populate_next_cands(game);
-        assert(pcands == &scands[0]);
-
+    while (++root_depth < Max_depth) {
         while (true) {
-            Cost best_cost = depth_first_search(game, root_depth, cost_glb, timeout);
+            std::cerr << "Searching at depth "
+                      << search_depth << std::endl;
 
-            /// Use a stable version of the algorithm so that actions with equal costs don't
-            /// get shuffled
-            std::stable_sort(pcands->begin(), pcands->end());
+            if (sactions[game.turn() + search_depth][0] == Action::None)
+                generate_actions(game, game.turn() + search_depth);
+
+            sa = &sactions[game.turn()];
+
+            best_cost = depth_first_search(game, sa, search_depth, cost_glb, timeout);
+
+            /// The stable version of the sort algorithm guarantees to preserve
+            /// the ordering of two elements of equal value.
+            std::stable_sort(sa->begin(), sa->end());
 
             if (best_cost <= Cost::Known_win)
-                loop_solved();
+                return loop_solved();
 
             if (timeout) {
-                std::cerr << "Agent: Timed out!"
-                          << std::endl;
+                std::cerr << "Agent: Timed out!" << std::endl;
+                timeout = false;
                 play_turn();
                 continue;
             }
 
-            // TODO: Use the least upper bound Cost function above to devise
-            // a good criterion to break from that loop.
             break;
         }
 
-        depth_completed = ++root_depth;
+        depth_completed = (search_depth = root_depth);
 
-        if (scands[0][0] != last_best_action) {
-            last_best_action = scands[0][0].action;
-            last_best_cost = scands[0][0].cost;
+        if ((*sa)[0] != last_best_action) {
+            last_best_action = (*sa)[0].action;
+            last_best_cost = (*sa)[0].cost;
             last_best_depth = root_depth;
+        }
+
+        /// Check if we have time for the next depth really
+        if (time.out()) {
+            play_turn();
+            time.reset();
         }
     }
 }
 
 void Agent::loop_solved()
 {
-
     std::cerr << "Agent: Entering loop_solved()"
               << std::endl;
 
+    sa = &sactions[game.turn()];
     while (true) {
-        assert(pcands);
-
-        *out << (*pcands++)[0] << std::endl;
-
-        if ((*pcands)[0] == Action::None) {
+        *out << (*sa++)[0] << std::endl;
+        if ((*sa)[0] == Action::None) {
             std::cerr << "Agent: Reached sentinel, exiting program."
                       << std::endl;
             return;
         }
-
         if (playing_online)
-            input_turn(*in, *st);
+            input_turn(*in, *st++);
     }
 }
 
 namespace {
 
-    Cost depth_first_search(Game& game, int depth, Cost cost_glb, bool& timeout)
+    Cost depth_first_search(Game& game, ActionList* sa, int depth, Cost cost_glb, bool& timeout)
     {
         Cost best_cost = Cost::Infinite;
 
-        for (auto& va : *pcands++) {
-            if (va.cost >= Cost::Known_loss) {
-                va.cost = Cost::Infinite;
-                continue;
-            }
-            game.apply(va.action, *st++);
+        if (depth == 0) {
+            for (auto& va : *sa) {
+                if (va.action == Action::None)
+                    continue;
 
-            if (depth == 0)
+                /// NOTE: Here (at the leaves of the tree) would be a good
+                /// place to generate the next list of candidates and
+                /// order them!
                 va.cost = eval(game) + penalty(game, va.action);
-            else
-                va.cost = depth_first_search(game, depth - 1, cost_glb, timeout);
 
-            game.undo();
-            --st;
-
-            if (va.cost < best_cost) {
-                best_cost = va.cost;
-                if (va.cost == Cost::Known_win)
-                    break;
+                if (va.cost < best_cost) {
+                    best_cost = va.cost;
+                    if (va.cost <= Cost::Known_win)
+                        break;
+                }
+                if (va.cost >= Cost::Known_loss) {
+                    va.cost = Cost::Infinite;
+                }
             }
+            /// NOTE: Not a good idea... what if each "pre-leaf" nodes happen to have
+            /// the maximum number of children!? We'd be making lots of sporadic bursts
+            /// of many calls to time.out() instead of spreading them out.
             if (time.out()) {
-                --pcands;
                 return timeout = true, best_cost;
             }
+        } else {
+            for (auto& va : *sa) {
+                if (va.cost == Cost::Infinite || va.action == Action::None)
+                    continue;
+                game.apply(*st++, va.action);
+                va.cost = depth_first_search(game, sa+1, depth - 1, cost_glb, timeout);
+                --st;
+                game.undo();
+                if (va.cost < best_cost) {
+                    best_cost = va.cost;
+                    if (va.cost <= Cost::Known_win)
+                        break;
+                }
+                if (timeout) {
+                    /// Notice we're querying `timeout` not `time.out()`
+                    return timeout = true, best_cost;
+                }
+                if (va.cost >= Cost::Known_loss) {
+                    va.cost = Cost::Infinite;
+                }
+            }
         }
-        if ((*pcands)[0].cost != best_cost)
-            std::swap((*pcands)[0], *std::find_if(pcands->begin(), pcands->end(), [&best_cost](auto va){
-                        return va.cost == best_cost;
-                    }));
-        --pcands;
+
+        /// Make sure the best nodes are always the leftmost ones (in particular,
+        /// this is how we will reconstruct the winning sequence if we just found one).
+        if ((*sa)[0].cost != best_cost)
+            std::swap((*sa)[0], *std::find_if(sa->begin(), sa->end(), [bc=best_cost](const auto& va) {
+                return va.cost == bc;
+            }));
+
         return best_cost;
     }
 
@@ -340,7 +331,7 @@ int main(int argc, char* argv[])
     Agent::init();
 
     Agent agent;
-    agent.setup(ifs, std::cout, 0, false);
+    agent.setup(ifs, std::cout, 150, false);
     agent.solve();
 
     return EXIT_SUCCESS;
