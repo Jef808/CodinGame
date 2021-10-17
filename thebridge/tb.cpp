@@ -160,8 +160,7 @@ void Game::apply(State& s, Action a) {
         
     s = *pstate;
     s.prev = pstate;
-
-    apply(s, std::move(a));
+    pstate = &s;
 
     pstate->key ^= Zobrist::key_pos[pstate->pos];
     pstate->key ^= Zobrist::get_key_bikes(*pstate);
@@ -187,6 +186,9 @@ void Game::apply(State& s, Action a) {
     default:
         break;
     }
+
+    ++pstate->turn;
+
     pstate->key ^= Zobrist::key_pos[pstate->pos];
     pstate->key ^= Zobrist::get_key_bikes(*pstate);
 }
@@ -222,7 +224,7 @@ int n_conseq_holes() {
     return n;
 }
 
-std::array<Action, 5> Game::candidates1() const
+std::array<Action, 5> Game::candidates() const
 {
     static const int longest_jump = n_conseq_holes();
     static std::array<Action, 5> actions {
@@ -231,95 +233,46 @@ std::array<Action, 5> Game::candidates1() const
 
     std::array<Action, 5> ret;
     ret.fill(Action::None);
+    auto it = ret.begin();
 
     // Speed is our first choice, but we cap the speed
     // to mix up the candidates a little
     if (pstate->speed < longest_jump + 1)
-        ret[0] = actions[0];
+        *it++ = actions[0];
 
     if (pstate->speed == 0) {
         return ret;
     }
 
     // Jump
-    ret[1] = actions[1];
+    *it++ = actions[1];
 
     // Filter Up/Downs
     if (!pstate->bikes[0])
-        ret[2] = actions[2];
+        *it++ = actions[2];
     if (!pstate->bikes[3])
-        ret[3] = actions[3];
+        *it++ = actions[3];
 
     // Slow
     if (pstate->speed > 1)
-        ret[4] = actions[4];
+        *it++ = actions[4];
 
     return ret;
 }
 
-const std::vector<Action>& Game::candidates() const
+void Game::show(std::ostream& _out) const
 {
-    static std::vector<Action> cands;
-    cands.clear();
-    size_t p = pstate->pos;
-    size_t s = pstate->speed;
+    const auto& road = params.road;
+    const auto& bikes = pstate->bikes;
 
-    if (s == 0) {
-        cands.push_back(Action::Speed);
-        return cands;
+    for (int i=0; i<4; ++i) {
+        for (int j=0; j<pstate->pos; ++j)
+            _out << (road[i][j] == Cell::Hole ? '0' : '-');
+        _out << (pstate->bikes[i] ? 'B' : (road[i][pstate->pos] == Cell::Hole ? '0' : '-'));
+        for (int j=pstate->pos+1; j<road[i].size(); ++j)
+            _out << (road[i][j] == Cell::Hole ? '0' : '-');
+        _out << std::endl;
     }
-
-    auto is_cand = [](Action a) {
-        return std::find(cands.begin(), cands.end(), a) != cands.end();
-    };
-    int max_deaths = n_bikes() - params.min_bikes;
-    // Speed
-    int n_deaths = 0;
-    if (pstate->speed < 50) {
-        for (int i = 0; i < 4; ++i) {
-            n_deaths = pstate->bikes[i] && (nex_holes[i][p] <= s + 1);
-        }
-        if (n_deaths <= max_deaths)
-            cands.push_back(Action::Speed);
-    }
-    // Jump
-    n_deaths = 0;
-    for (int i = 0; i < 4; ++i) {
-        n_deaths += pstate->bikes[i] && (params.road[i][p+s] == Cell::Hole);
-    }
-    if (n_deaths <= max_deaths)
-        cands.push_back(Action::Jump);
-    // Slow
-    n_deaths = 0;
-    if (s > 0) {
-        for (int i = 0; i < 4; ++i) {
-            n_deaths += pstate->bikes[i] && (nex_holes[i][p] < s);
-        }
-        if (n_deaths <= max_deaths)
-            cands.push_back(Action::Slow);
-    }
-    // Up
-    n_deaths = 0;
-    if (!pstate->bikes[0]) {
-        for (int i = 1; i < 4; ++i) {
-            n_deaths += (pstate->bikes[i] && (nex_holes[i][p] < s || nex_holes[i - 1][p] <= s));
-        }
-        if (n_deaths <= max_deaths)
-            cands.push_back(Action::Up);
-    }
-    // Down
-    n_deaths = 0;
-    if (!pstate->bikes[3]) {
-        for (int i = 0; i < 3; ++i) {
-            n_deaths += pstate->bikes[i] && (nex_holes[i][p] < s || nex_holes[i + 1][p] <= s);
-        }
-        if (n_deaths <= max_deaths)
-            cands.push_back(Action::Down);
-    }
-    // Mix up Up / Down
-    if (is_cand(Action::Up) && is_cand(Action::Down) && rand() % 2)
-        std::swap(cands[cands.size()-1], cands[cands.size()-2]);
-    return cands;
 }
 
 std::ostream& operator<<(std::ostream& out, const tb::Action a)
@@ -342,6 +295,5 @@ std::ostream& operator<<(std::ostream& out, const tb::Action a)
         return out << "NONE";
     }
 }
-
 
 } // namespace tb

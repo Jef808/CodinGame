@@ -9,7 +9,6 @@ set( CMAKE_BUILD_TYPE debug )
 set( SOURCES
   tb.cpp
   agent.cpp
-  actionstack.cpp
   )
 
 add_executable( tb ${SOURCES} )

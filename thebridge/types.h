@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <cstdlib>
+#include <iosfwd>
 #include <type_traits>
 
 namespace tb {
@@ -39,6 +40,8 @@ enum class Cost : int {
     Known_loss = 51,
     Infinite = 63
 };
+
+std::ostream& operator<<(std::ostream& _out, const Cost c);
 
 inline Cost operator+(const Cost c, const int i) {
     return Cost( to_int(c) + i );

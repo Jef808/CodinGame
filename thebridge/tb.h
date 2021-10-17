@@ -2,9 +2,7 @@
 #define TB_H_
 
 #include <array>
-#include <cassert>
 #include <iosfwd>
-#include <utility>
 #include <vector>
 
 #include "types.h"
@@ -51,27 +49,21 @@ public:
     void set(State&);
     void apply(State&, Action a);
     void undo();
+    std::array<Action, 5> candidates() const;
     bool is_won() const;
     bool is_lost() const;
     uint32_t key() const;
+    int n_bikes() const;
     int turn() const { return pstate->turn; }
     int pos() const { return pstate->pos; }
     size_t get_speed() const { return pstate->speed; }
     size_t road_length() const { return pparams->road[0].size(); }
-    int n_bikes() const;
-    size_t n_bikes_start() const { return pparams->start_bikes; }
-    int ratio_bikes_left() const;
-    //size_t hole_dist(size_t lane, size_t pos) const;
-    //bool win_past_all_holes() const;
     Params const* parameters() const { return pparams; }
-    Agent* handling_agent() const { return phandling_agent; }
-    std::array<Action, 5> candidates1() const;
-    const std::vector<Action>& candidates() const;
+    void show(std::ostream&) const;
 
 private:
     State* pstate;
     Params * const pparams = &tb::params;
-    Agent* phandling_agent;
 };
 
 inline bool Game::is_won() const {

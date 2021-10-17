@@ -1,6 +1,6 @@
 #include "agent.h"
-#include "actionstack.h"
 #include "tb.h"
+#include "timeutil.h"
 #include "types.h"
 
 #include <algorithm>
@@ -14,72 +14,45 @@ std::ostream& operator<<(std::ostream& _out, const VAction& va)
     return _out << va.action;
 }
 
+std::ostream& operator<<(std::ostream& _out, const Cost c)
+{
+    return _out << to_int(c);
+}
+
 namespace {
 
     using ActionList = std::array<VAction, Max_actions>;
 
     ActionList sactions[Max_depth + 1];
-    ActionList* sa { &sactions[0] };
     State sstates[Max_depth + 1];
     State* st { &sstates[1] };
 
     const Params* game_params;
     Timer time;
 
-    void view_tree()
-    {
-        while (*sa->begin() != Action::None) {
-            for (const auto& va : *sa) {
-                if (va != Action::None)
-                    std::cout << "{ " << va.action << ' '
-                              << to_int(va.cost) << " }, ";
-                std::cout << '\n'
-                          << std::endl;
-            }
-        }
-    }
+    std::ostream& operator<<(std::ostream& _out, const ActionList& al);
 
     /**
      * Read the turn input from the istream, updating the agent's
      * current game state if the `update_state` flag is set.
      */
-    void input_turn(std::istream& _in, State& st, bool update_state = false)
-    {
-        if (update_state) {
-            int x, y, a; // NOTE: x-coord, y-coord, active-or-not
-            _in >> st.speed;
-            _in.ignore();
+    void input_turn(std::istream& _in, State& st, bool update_state = false);
 
-            for (int i = 0; i < game_params->start_bikes; ++i) {
-                _in >> x >> y >> a;
-                _in.ignore();
-                st.bikes[i] = (a == 1);
-            }
-            st.pos = x;
-        } else {
-            std::string buf;
-            for (int i = 0; i < game_params->start_bikes + 1; ++i)
-                std::getline(_in, buf);
-        }
-    }
+    /**
+     * Populate a layer in the ActionList array.
+     */
+    void generate_actions(Game& game, int depth);
 
-    void generate_actions(Game& game, int depth)
-    {
-        for (auto a : game.candidates1())
-            std::transform(game.candidates1().begin(), game.candidates1().end(), sactions[depth].begin(), [](auto a) {
-                Cost cost = a == Action::None ? Cost::Infinite : Cost::Unknown;
-                return VAction{ a, Cost(cost) };
-            });
-    }
-
+    /**
+     * The main method used for the search.
+     */
     Cost depth_first_search(Game& game, ActionList* sa,int depth, Cost cost_glb, bool& timeout);
 
 } // namespace
 
+
 void Agent::setup(std::istream& _in, std::ostream& _out, int timelim_ms, bool online)
 {
-    init();
-
     in = &_in;
     out = &_out;
 
@@ -97,15 +70,20 @@ void Agent::setup(std::istream& _in, std::ostream& _out, int timelim_ms, bool on
     game_over = false;
 
     std::for_each(&sactions[0], &sactions[Max_depth], [](auto& al){
-        al.fill(VAction{ Action::None, Cost::Unknown });
+        al.fill(VAction{});
     });
+
+    game.show(std::cerr);
 }
 
+/**
+ * To play a turn in the middle of the search.
+ */
 bool Agent::play_turn()
 {
-    *out << (*sa++)[0] << std::endl;
+    *out << sactions[game.turn()][0] << std::endl;
 
-    game.apply(*st++, (*sa)[0].action);
+    game.apply(*st++, sactions[game.turn()][0].action);
 
     game_over = game.is_lost() || game.is_won();
 
@@ -124,13 +102,35 @@ bool Agent::play_turn()
 }
 
 /**
+ * Jump to this loop once the agent finds a full solution.
+ */
+void Agent::loop_solved()
+{
+    std::cerr << "Entering loop_solved()"
+              << std::endl;
+
+    ActionList* sa = &sactions[game.turn()];
+
+    while (true) {
+        *out << (*sa++)[0] << std::endl;
+        if ((*sa)[0] == Action::None) {
+            std::cerr << "Agent: Reached sentinel, exiting program."
+                      << std::endl;
+            return;
+        }
+        if (playing_online)
+            input_turn(*in, *st++);
+    }
+}
+
+/**
  * The greatest lower bound for the number of turns in
  * which it is possible to reach the end of the road.
  */
 inline int turn_glb(const Game& g)
 {
     int t = 0;
-    while (t * (2 * g.get_speed() + t + 1) < 2 * (g.road_length() - g.pos()))
+    while (t * (2 * g.get_speed() + t + 1) < 2 * (game_params->road.size() - g.pos()))
         ++t;
     return t;
 }
@@ -151,18 +151,22 @@ inline Cost eval(const Game& g)
  */
 Cost penalty(Game& g, Action a)
 {
-    static const int& nb_min = game_params->min_bikes;
+    static const int nb_min = game_params->min_bikes;
 
     int nb_prev = g.n_bikes();
-    g.apply(*st, std::move(a));
-    g.undo();
-    int nb_nex = g.n_bikes();
+    g.apply(*st, a);
 
-    return (nb_nex < nb_min || g.turn() > 50)
+    Cost ret = (g.n_bikes() < nb_min || g.turn() > 50)
         ? Cost::Infinite
-        : Cost(1 + 5 * (nb_nex - nb_prev));
+        : Cost(1 + 5 * (g.n_bikes() - nb_prev));
+
+    g.undo();
+    return ret;
 }
 
+/**
+ * Main method to be called from main.
+ */
 void Agent::solve()
 {
     time.reset();
@@ -178,6 +182,8 @@ void Agent::solve()
 
     root_depth = 0;
     int search_depth = 0;
+
+    ActionList* sa = &sactions[0];
 
     while (++root_depth < Max_depth) {
         while (true) {
@@ -202,6 +208,7 @@ void Agent::solve()
                 std::cerr << "Agent: Timed out!" << std::endl;
                 timeout = false;
                 play_turn();
+                game.show(std::cerr);
                 continue;
             }
 
@@ -224,29 +231,16 @@ void Agent::solve()
     }
 }
 
-void Agent::loop_solved()
-{
-    std::cerr << "Agent: Entering loop_solved()"
-              << std::endl;
-
-    sa = &sactions[game.turn()];
-    while (true) {
-        *out << (*sa++)[0] << std::endl;
-        if ((*sa)[0] == Action::None) {
-            std::cerr << "Agent: Reached sentinel, exiting program."
-                      << std::endl;
-            return;
-        }
-        if (playing_online)
-            input_turn(*in, *st++);
-    }
-}
-
 namespace {
 
     Cost depth_first_search(Game& game, ActionList* sa, int depth, Cost cost_glb, bool& timeout)
     {
         Cost best_cost = Cost::Infinite;
+
+        std::cerr << "Depth: "
+                  << depth
+                  << " Actions are "
+                  << *sa << std::endl;
 
         if (depth == 0) {
             for (auto& va : *sa) {
@@ -298,13 +292,62 @@ namespace {
 
         /// Make sure the best nodes are always the leftmost ones (in particular,
         /// this is how we will reconstruct the winning sequence if we just found one).
-        if ((*sa)[0].cost != best_cost)
+        if ((*sa)[0].cost != best_cost && best_cost < Cost::Unknown)
             std::swap((*sa)[0], *std::find_if(sa->begin(), sa->end(), [bc=best_cost](const auto& va) {
                 return va.cost == bc;
             }));
 
         return best_cost;
     }
+
+    void input_turn(std::istream& _in, State& st, bool update_state)
+    {
+        if (update_state) {
+            int x, y, a; // NOTE: x-coord, y-coord, active-or-not
+            _in >> st.speed;
+            _in.ignore();
+
+            for (int i = 0; i < game_params->start_bikes; ++i) {
+                _in >> x >> y >> a;
+                _in.ignore();
+                st.bikes[i] = (a == 1);
+            }
+            st.pos = x;
+        } else {
+            std::string buf;
+            for (int i = 0; i < game_params->start_bikes + 1; ++i)
+                std::getline(_in, buf);
+        }
+    }
+
+    void generate_actions(Game& game, int depth)
+    {
+        for (auto a : game.candidates())
+            std::transform(game.candidates().begin(), game.candidates().end(), sactions[depth].begin(), [](auto a) {
+                return VAction{ a };
+            });
+    }
+
+    std::ostream& operator<<(std::ostream& _out, const ActionList& al)
+    {
+        for (const auto& a : al)
+            _out << a.action
+                 << ' ' << a.cost << ' ';
+        return _out;
+    }
+
+    // void view_tree()
+    // {
+    //     while (*sa->begin() != Action::None) {
+    //         for (const auto& va : *sa) {
+    //             if (va != Action::None)
+    //                 std::cout << "{ " << va.action << ' '
+    //                           << to_int(va.cost) << " }, ";
+    //             std::cout << '\n'
+    //                       << std::endl;
+    //         }
+    //     }
+    // }
 
 } // namespace
 
@@ -314,7 +357,8 @@ using namespace tb;
 
 int main(int argc, char* argv[])
 {
-    const int max_time = 150;
+    const int turn_time_ms = 150;
+    const bool online = false;
 
     if (argc < 2) {
         std::cerr << "Main: Input file needed!" << std::endl;
@@ -328,10 +372,9 @@ int main(int argc, char* argv[])
     }
 
     Game::init(ifs);
-    Agent::init();
-
     Agent agent;
-    agent.setup(ifs, std::cout, 150, false);
+    agent.setup(ifs, std::cout, turn_time_ms, online);
+
     agent.solve();
 
     return EXIT_SUCCESS;

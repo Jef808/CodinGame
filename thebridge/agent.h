@@ -2,17 +2,14 @@
 #define AGENT_H_
 
 #include "tb.h"
-#include "timeutil.h"
 
 namespace tb {
 
 class Agent {
 public:
-    static void init();
     Agent() = default;
     void setup(std::istream&, std::ostream&, int timelim_ms = 0, bool online = true);
     void solve();
-    int get_root_depth() const { return root_depth; }
 
 private:
     Game game;
@@ -30,10 +27,14 @@ private:
 };
 
 struct VAction {
-    VAction() = default;
-    VAction(Action a, Cost c)
+    VAction()
+        : action { Action::None }
+        , cost { Cost::Unknown }
+    {
+    }
+    explicit VAction(Action a)
         : action { a }
-        , cost { a }
+        , cost { a == Action::None ? Cost::Infinite : Cost::Unknown }
     {
     }
     Action action { Action::None };
