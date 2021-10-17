@@ -129,9 +129,16 @@ void Agent::loop_solved()
  */
 inline int turn_glb(const Game& g)
 {
-    int t = 0;
-    while (t * (2 * g.get_speed() + t + 1) < 2 * (game_params->road.size() - g.pos()))
-        ++t;
+    int p = g.pos(), t = 0;
+
+    while (p < g.road_length()) {
+        t += 1;
+        p += p+1;
+    }
+
+    std::cerr << "turn_glb(g) = "
+        << t << std::endl;
+
     return t;
 }
 
@@ -158,7 +165,11 @@ Cost penalty(Game& g, Action a)
 
     Cost ret = (g.n_bikes() < nb_min || g.turn() > 50)
         ? Cost::Infinite
-        : Cost(1 + 5 * (g.n_bikes() - nb_prev));
+        : Cost(5 * (g.n_bikes() - nb_prev));
+
+    g.show(std::cerr);
+    std::cerr << "Penalty: "
+        << ret << std::endl;
 
     g.undo();
     return ret;
@@ -335,19 +346,6 @@ namespace {
                  << ' ' << a.cost << ' ';
         return _out;
     }
-
-    // void view_tree()
-    // {
-    //     while (*sa->begin() != Action::None) {
-    //         for (const auto& va : *sa) {
-    //             if (va != Action::None)
-    //                 std::cout << "{ " << va.action << ' '
-    //                           << to_int(va.cost) << " }, ";
-    //             std::cout << '\n'
-    //                       << std::endl;
-    //         }
-    //     }
-    // }
 
 } // namespace
 
