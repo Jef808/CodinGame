@@ -28,7 +28,7 @@ namespace {
 
 void Game::init(std::istream& _in)
 {
-    params.entry_pos = -1;
+    ps = &root_state;
     int n_elevators;
     _in >> params.height
         >> params.width
@@ -45,12 +45,18 @@ void Game::init(std::istream& _in)
         _in >> el.floor >> el.pos;
     }
 
+    // Order the elevators by floor then by pos
+    std::sort(params.elevators.begin(), params.elevators.end(), [](const auto& a, const auto& b) {
+        return a.floor < b.floor
+            || (a.floor == b.floor && a.pos < b.pos);
+    });
+
     // First turn because not everything is initialized
-    std::string buf;
-    _in >> ps->floor >> ps->pos >> buf;
+    char d;
+    _in >> ps->floor >> ps->pos >> d;
     _in.ignore();
 
-    ps->dir = (buf[0] == 'L' ? State::Left : State::Right);
+    ps->dir = (d == 'L' ? State::Left : State::Right);
     ps->turn = 1;
 
     params.entry_pos = ps->pos;

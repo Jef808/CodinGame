@@ -10,10 +10,12 @@
 
 namespace dp {
 
-struct Elevator {
+struct Point {
     int floor;
     int pos;
 };
+
+typedef Point Elevator;
 
 struct State {
     enum Dir { Left, Right } dir;
@@ -52,9 +54,6 @@ inline const State* Game::state() const { return ps; }
 } // namespace dp
 
 extern void extract_online_init(std::ostream&);
-
-// TODO Is this needed if I want to allow the agent access?
-extern dp::GameParams params;
 
 
 #endif // DP_H_

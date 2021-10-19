@@ -7,8 +7,6 @@
 #include "dp.h"
 #include "agent.h"
 
-static_assert(RUNNING_OFFLINE ^ EXTRACTING_ONLINE_DATA);
-
 #if FMT_ENABLED
   #include "viewutils.h"
 #endif
@@ -28,7 +26,12 @@ void solve()
     dp::Agent agent;
     for (int i=0; i<100; ++i)
     {
-        std::cout << agent.best_choice();
+        std::cout << agent.best_choice() << std::endl;
+
+    #if RUNNING_OFFLINE
+        return;
+    #endif
+
         ignore_turn(std::cin);
     }
 }
@@ -63,6 +66,8 @@ int main(int argc, char *argv[]) {
             return EXIT_FAILURE;
         }
     }
+
+    //fmt::print("Successfully opened the file");
 
     Game game;
     game.init(ifs);
