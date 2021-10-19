@@ -23,7 +23,8 @@ struct State {
     int pos;
     int turn;
     int used_clones;
-    std::array<Elevator, max_height> new_elevators;
+    int used_elevators;
+    State* prev;
 };
 
 struct GameParams {

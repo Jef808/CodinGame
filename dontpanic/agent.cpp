@@ -19,9 +19,7 @@ namespace dp {
             Infinite=200,
         };
 
-        struct Action {
-            Action() = default;
-        };
+        typedef Point Action;
 
         State states[max_turns + 1];
         State* ps = &states[0];
@@ -118,6 +116,46 @@ namespace dp {
             {
                 std::copy(seen[i].begin(), seen[i].begin() + params->width, std::back_inserter(candidates.emplace_back()));
             }
+        }
+
+        /// Method to evaluate the cost of an action on a state
+        Cost cost(const State& s, const Action a)
+        {
+            const bool block = (s.dir == State::Left) && (a.pos > s.pos)
+                || (s.dir == State::Right) && (a.pos < s.pos);
+
+            const bool elevator = a.floor > s.floor;
+
+            const int distance = std::abs(a.pos - s.pos);
+
+            return Cost(block * 3 + elevator * 3 + distance + 1);
+        }
+
+        inline State::Dir opposite(State::Dir d) {
+            return d == State::Left ? State::Right : State::Left;
+        }
+
+        State& apply(State& s, const Action a)
+        {
+            const bool block = (s.dir == State::Left) && (a.pos > s.pos)
+                || (s.dir == State::Right) && (a.pos < s.pos);
+
+            const bool elevator = a.floor > s.floor;
+
+            const int distance = std::abs(a.pos - s.pos);
+
+            State& nex = *ps++;
+            nex = s;
+            nex.prev = &s;
+
+            nex.pos = a.pos;
+            nex.floor = a.floor;
+            nex.turn -= block * 3 + elevator * 3 + distance + 1;
+            nex.used_clones -= (block || elevator);
+            nex.used_elevators -= elevator;
+            nex.dir = block ? opposite(nex.dir) : nex.dir;
+
+            return nex;
         }
 
     }  // namespace
