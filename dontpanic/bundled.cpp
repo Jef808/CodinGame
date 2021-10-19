@@ -1,5 +1,65 @@
-#include "types.h"
-#include "dp.h"
+#ifndef __TYPES_H_
+#define __TYPES_H_
+
+#define FMT_ENABLED 0
+#define RUNNING_OFFLINE FMT_ENABLED
+#define EXTRACTING_ONLINE_DATA 0
+
+#endif
+
+#ifndef DP_H_
+#define DP_H_
+
+#include <iosfwd>
+#include <string>
+
+namespace dp {
+
+enum class Cell;
+struct State;
+
+class Game {
+public:
+    Game() = default;
+    void init(std::istream&);
+    void view() const;
+    const State* state() const;
+private:
+    State* ps;
+};
+
+inline const State* Game::state() const { return ps; }
+
+} // namespace dp
+
+extern void extract_online_init(std::ostream&);
+
+
+
+#endif // DP_H_
+
+#ifndef AGENT_H_
+#define AGENT_H_
+
+namespace dp {
+
+class Agent {
+public:
+    explicit Agent(Game& game);
+    std::string best_choice();
+private:
+    Game& game;
+};
+
+inline std::string Agent::best_choice() {
+    auto ret = "WAIT";
+    return ret;
+}
+
+
+} // namespace dp
+
+#endif // AGENT_H_
 
 #if FMT_ENABLED
   #include "viewutils.h"
@@ -192,4 +252,105 @@ void extract_online_init(std::ostream& out)
 
 #endif // EXTRACTING_ONLINE_DATA
 
-} // namespace dp
+
+Agent::Agent(Game& _game) :
+    game(_game)
+{
+}
+
+}  // namespace dp
+
+
+
+/// MAIN
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <string_view>
+
+namespace {
+
+
+void ignore_turn(std::istream& _in)
+{
+    static std::string _turn_buffer;
+    std::getline(_in, _turn_buffer);
+}
+
+void solve(dp::Game& game)
+{
+    dp::Agent agent(game);
+
+    while (true) {
+        std::cout << agent.best_choice() << std::endl;
+        ignore_turn(std::cin);
+    }
+}
+
+
+}  // namespace
+
+
+using namespace dp;
+
+int main(int argc, char *argv[]) {
+
+#if RUNNING_OFFLINE
+    if (argc < 2)
+    {
+        fmt::print(stderr, "USAGE: {} [Test number]\n", argv[0]);
+        return EXIT_FAILURE;
+    }
+
+    std::string fn;
+    fmt::format_to(std::back_inserter(fn), "../data/test{}.txt", argv[1]);
+
+    std::ifstream ifs{ fn };
+
+    if (!ifs) {
+        ifs.clear();
+        fn = fn.substr(3);
+        ifs.open(fn, std::ios_base::in);
+        if (!ifs) {
+            fmt::print("Failed to open both {} and ../{}\n", fn, fn);
+            return EXIT_FAILURE;
+        }
+    }
+
+    Game game;
+    game.init(ifs);
+
+    game.view();
+    fmt::print("{}\n", "Successfully initialized the view");
+
+    fmt::print("{}\n", "Successfully initialized the agent");
+    fmt::format("{}\n", "Starting main loop");
+
+/// Running Online
+#else
+
+    std::ios_base::sync_with_stdio(false);
+
+  #if EXTRACTING_ONLINE_DATA
+    extract_online_init(std::ostream&);
+    return EXIT_SUCCESS;
+
+  #else
+    Game game;
+    game.init(std::cin);
+
+  #endif
+#endif
+
+    /// Main loop
+    Agent agent{game};
+
+    solve(game);
+
+
+    std::cerr << "Exiting the program."
+        << std::endl;
+
+
+    return EXIT_SUCCESS;
+}
