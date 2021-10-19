@@ -9,16 +9,7 @@
 #include <fmt/format.h>
 
 #include "dp.h"
-
-namespace {
-
-template<typename Enum>
-std::underlying_type_t<Enum>
-constexpr inline to_int(Enum e) noexcept {
-    return static_cast<std::underlying_type_t<Enum>>(e);
-}
-
-}  // namespace
+#include "types.h"
 
 namespace dp {
 

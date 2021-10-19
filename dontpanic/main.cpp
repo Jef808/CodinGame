@@ -23,9 +23,9 @@ void ignore_turn(std::istream& _in)
     std::getline(_in, buf);
 }
 
-void solve(::dp::Game& game)
+void solve()
 {
-    dp::Agent agent(game);
+    dp::Agent agent;
     for (int i=0; i<100; ++i)
     {
         std::cout << agent.best_choice();
@@ -41,6 +41,7 @@ using namespace dp;
 
 int main(int argc, char *argv[]) {
 
+/// Running Offline
 #if RUNNING_OFFLINE
     if (argc < 2)
     {
@@ -76,7 +77,6 @@ int main(int argc, char *argv[]) {
   #if EXTRACTING_ONLINE_DATA
     extract_online_init(std::ostream&);
     return EXIT_SUCCESS;
-
   #else
     Game game;
     game.init(std::cin);
@@ -84,8 +84,9 @@ int main(int argc, char *argv[]) {
   #endif
 #endif
 
-    /// Main loop
-    solve(game);
+/// Main loop
+    Agent::init(game);
+    solve();
 
     std::cerr << "Exiting the program."
         << std::endl;

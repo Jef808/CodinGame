@@ -14,42 +14,11 @@
 
 namespace dp {
 
-constexpr int max_turns = 200;
-constexpr int max_height = 15;
-constexpr int max_width = 100;
-constexpr int max_n_clones = 50;
-constexpr int max_n_elevators = 100;
-constexpr int max_time_ms = 100;
-
-struct Elevator {
-    int floor;
-    int pos;
-};
-
-struct GameParams {
-    int height;
-    int width;
-    int max_round;
-    int exit_floor;
-    int exit_pos;
-    int max_clones;
-    int n_add_elevators;
-    int entry_pos;
-    std::vector<Elevator> elevators;
-} params{};
-
-struct State {
-    enum Dir { Left, Right } dir;
-    int floor;
-    int pos;
-    int turn;
-    std::vector<Elevator> new_elevators;
-};
-
 /// Globals
 namespace {
 
-    State states[max_turns + 1];
+    GameParams params{};
+    State root_state{};
 
     std::string board_view{};
     std::string buf{};
@@ -59,9 +28,6 @@ namespace {
 
 void Game::init(std::istream& _in)
 {
-    std::fill_n(&states[0], max_turns+1, State{});
-    ps = &states[0];
-
     params.entry_pos = -1;
     int n_elevators;
     _in >> params.height
@@ -74,6 +40,7 @@ void Game::init(std::istream& _in)
         >> n_elevators;
 
     for (int i=0; i<n_elevators; ++i) {
+
         auto& el = params.elevators.emplace_back();
         _in >> el.floor >> el.pos;
     }
@@ -89,6 +56,9 @@ void Game::init(std::istream& _in)
     params.entry_pos = ps->pos;
 }
 
+const GameParams* Game::get_params() const {
+    return &params;
+}
 
 #if FMT_ENABLED
 

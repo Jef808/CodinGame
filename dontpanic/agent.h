@@ -7,20 +7,14 @@ namespace dp {
 
 class Agent {
 public:
-    explicit Agent(Game& game);
+    static void init(const Game&);
+    Agent() = default;
+    /// The main search method
+    void search();
+    /// The best choice to date
     std::string best_choice();
 private:
-    Game& game;
 };
-
-inline Agent::Agent(Game& _game) :
-    game(_game)
-{
-}
-
-inline std::string Agent::best_choice() {
-    return "WAIT";
-}
 
 
 } // namespace dp
