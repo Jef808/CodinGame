@@ -6,25 +6,14 @@
 #include <array>
 #include <iosfwd>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace dp {
 
-struct Point {
+struct Elevator {
     int floor;
     int pos;
-};
-
-typedef Point Elevator;
-
-struct State {
-    enum Dir { Left, Right } dir;
-    int floor;
-    int pos;
-    int turn;
-    int used_clones;
-    int used_elevators;
-    State* prev;
 };
 
 struct GameParams {
@@ -39,13 +28,27 @@ struct GameParams {
     std::vector<Elevator> elevators;
 };
 
+struct State {
+    enum Dir { Left, Right } dir;
+    int floor;
+    int pos;
+    int turn;
+    int used_clones;
+    int used_elevators;
+    State* prev;
+};
+
+enum class Action {
+    Wait, Block, Elevator
+};
+
 class Game {
 public:
     Game() = default;
     void init(std::istream&);
-    void view() const;
     const State* state() const;
     const GameParams* get_params() const;
+    const State& get_root_state() const;
 private:
     State* ps;
 };
@@ -54,7 +57,7 @@ inline const State* Game::state() const { return ps; }
 
 } // namespace dp
 
-extern void extract_online_init(std::ostream&);
+extern void extract_online_init();
 
 
 #endif // DP_H_

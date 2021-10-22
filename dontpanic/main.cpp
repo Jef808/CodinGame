@@ -1,3 +1,6 @@
+#define RUNNING_OFFLINE 1
+#define EXTRACTING_ONLINE_DATA 0
+
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -7,37 +10,46 @@
 #include "dp.h"
 #include "agent.h"
 
-#if FMT_ENABLED
-  #include "viewutils.h"
+#if RUNNING_OFFLINE
+  #include <fmt/core.h>
+  #include <fmt/format.h>
 #endif
 
 
-namespace {
+std::ostream& operator<<(std::ostream&, const dp::Action);
 
 void ignore_turn(std::istream& _in)
 {
     static std::string buf;
     buf.clear();
     std::getline(_in, buf);
+    _in.ignore();
 }
 
 void solve()
 {
-    dp::Agent agent;
+    Agent agent;
+
+#if RUNNING_OFFLINE
+
     for (int i=0; i<100; ++i)
     {
-        std::cout << agent.best_choice() << std::endl;
+        auto action = agent.best_choice();
+    }
 
-    #if RUNNING_OFFLINE
-        return;
-    #endif
+    return;
+
+#endif
+
+    for (int i=0; i<100; ++i)
+    {
+        auto action = agent.best_choice();
+        std::cout << action << std::endl;
 
         ignore_turn(std::cin);
     }
 }
 
-
-}  // namespace
 
 
 using namespace dp;
@@ -55,46 +67,37 @@ int main(int argc, char *argv[]) {
     std::string fn;
     fmt::format_to(std::back_inserter(fn), "../data/test{}.txt", argv[1]);
 
-    std::ifstream ifs{ fn };
+    std::ifstream ifs{ fn.data() };
 
     if (!ifs) {
-        ifs.clear();
-        fn = fn.substr(3);
-        ifs.open(fn, std::ios_base::in);
-        if (!ifs) {
-            fmt::print("Failed to open both {} and ../{}\n", fn, fn);
-            return EXIT_FAILURE;
-        }
+        fmt::print("Failed to open input file {}", fn);
+        return EXIT_FAILURE;
     }
-
-    //fmt::print("Successfully opened the file");
 
     Game game;
     game.init(ifs);
 
-    game.view();
-    fmt::print("{}\n", "Successfully initialized the view");
-
-    fmt::format("{}\n", "Starting main loop");
+    // game.view();
+    // fmt::print("{}\n", "Successfully initialized the view");
 
 /// Running Online
 #else
-  #if EXTRACTING_ONLINE_DATA
-    extract_online_init(std::ostream&);
+#if EXTRACTING_ONLINE_DATA
+
+    extract_online_init();
     return EXIT_SUCCESS;
-  #else
+
+#else
+
     Game game;
     game.init(std::cin);
 
-  #endif
+#endif
 #endif
 
-/// Main loop
+    /// Main loop
     Agent::init(game);
     solve();
-
-    std::cerr << "Exiting the program."
-        << std::endl;
 
     return EXIT_SUCCESS;
 }
