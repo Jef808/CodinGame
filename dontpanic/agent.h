@@ -6,8 +6,7 @@ class Game;
 enum class Action;
 }
 
-class Agent
-{
+class Agent {
 public:
     static void init(const dp::Game&);
 
@@ -18,8 +17,6 @@ public:
 
     /// The best choice to date
     dp::Action best_choice();
-
 };
-
 
 #endif // AGENT_H_

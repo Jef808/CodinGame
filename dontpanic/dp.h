@@ -1,15 +1,17 @@
 #ifndef DP_H_
 #define DP_H_
 
-#include "types.h"
-
-#include <array>
 #include <iosfwd>
-#include <string>
-#include <string_view>
 #include <vector>
 
 namespace dp {
+
+constexpr int max_turns = 200;
+constexpr int max_height = 15;
+constexpr int max_width = 100;
+constexpr int max_n_clones = 50;
+constexpr int max_n_elevators = 100;
+constexpr int max_time_ms = 100;
 
 struct Elevator {
     int floor;
@@ -29,7 +31,8 @@ struct GameParams {
 };
 
 struct State {
-    enum Dir { Left, Right } dir;
+    enum Dir { Left,
+        Right } dir;
     int floor;
     int pos;
     int turn;
@@ -39,7 +42,9 @@ struct State {
 };
 
 enum class Action {
-    Wait, Block, Elevator
+    Wait,
+    Block,
+    Elevator
 };
 
 class Game {
@@ -49,6 +54,7 @@ public:
     const State* state() const;
     const GameParams* get_params() const;
     const State& get_root_state() const;
+
 private:
     State* ps;
 };
@@ -58,6 +64,5 @@ inline const State* Game::state() const { return ps; }
 } // namespace dp
 
 extern void extract_online_init();
-
 
 #endif // DP_H_

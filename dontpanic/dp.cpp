@@ -1,23 +1,19 @@
-#include "types.h"
 #include "dp.h"
 
 #include <algorithm>
 #include <cassert>
 #include <iostream>
-#include <sstream>
-#include <string_view>
 #include <vector>
-
 
 namespace dp {
 
 /// Globals
 namespace {
 
-    GameParams params{};
-    State root_state{};
+    GameParams params {};
+    State root_state {};
 
-}  // namespace
+} // namespace
 
 void Game::init(std::istream& _in)
 {
@@ -32,8 +28,7 @@ void Game::init(std::istream& _in)
         >> params.n_add_elevators
         >> n_elevators;
 
-    for (int i=0; i<n_elevators; ++i) {
-
+    for (int i = 0; i < n_elevators; ++i) {
         auto& el = params.elevators.emplace_back();
         _in >> el.floor >> el.pos;
     }
@@ -55,7 +50,8 @@ void Game::init(std::istream& _in)
     });
 }
 
-const GameParams* Game::get_params() const {
+const GameParams* Game::get_params() const
+{
     return &params;
 }
 
@@ -67,30 +63,30 @@ void extract_online_init()
     Game game;
     game.init(std::cin);
 
-    std::stringstream ss{};
+    std::stringstream ss {};
 
-    ss  << params.height           << ' '
-        << params.width            << ' '
-        << params.max_round        << ' '
-        << params.exit_floor       << ' '
-        << params.exit_pos         << ' '
-        << params.max_clones       << ' '
-        << params.n_add_elevators  << ' '
-        << params.elevators.size()
-        << '\n';
+    ss << params.height << ' '
+       << params.width << ' '
+       << params.max_round << ' '
+       << params.exit_floor << ' '
+       << params.exit_pos << ' '
+       << params.max_clones << ' '
+       << params.n_add_elevators << ' '
+       << params.elevators.size()
+       << '\n';
 
     for (const auto& el : params.elevators) {
-        ss  << el.floor << ' '
-            << el.pos
-            << '\n';
+        ss << el.floor << ' '
+           << el.pos
+           << '\n';
     }
 
     char d;
-    ss  << ps->floor << ' '
-        << ps->pos << ' '
-        << d;
-        << (d == 'L' ? State::Left : State::Right)
-        << '\n';
+    ss << ps->floor << ' '
+       << ps->pos << ' '
+       << d;
+    << (d == 'L' ? State::Left : State::Right)
+    << '\n';
 
     out << ss.str() << std::endl;
     out << "Successfully read all data." << std::endl;

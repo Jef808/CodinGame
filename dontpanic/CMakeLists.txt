@@ -26,6 +26,7 @@ if ( with_fmt )
 endif()
 if ( with_view )
   add_subdirectory( ${view_dir} )
+  list( APPEND libs dpview )
 endif()
 
 add_executable( main ${main_SOURCES} )

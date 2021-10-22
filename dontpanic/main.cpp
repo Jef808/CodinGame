@@ -1,20 +1,19 @@
 #define RUNNING_OFFLINE 1
 #define EXTRACTING_ONLINE_DATA 0
 
-#include <iostream>
 #include <fstream>
+#include <iostream>
 #include <string>
 #include <string_view>
 
-#include "types.h"
-#include "dp.h"
 #include "agent.h"
+#include "dp.h"
+#include "view/dpview.h"
 
 #if RUNNING_OFFLINE
-  #include <fmt/core.h>
-  #include <fmt/format.h>
+#include <SFML/Graphics.hpp>
+#include <fmt/format.h>
 #endif
-
 
 std::ostream& operator<<(std::ostream&, const dp::Action);
 
@@ -32,8 +31,7 @@ void solve()
 
 #if RUNNING_OFFLINE
 
-    for (int i=0; i<100; ++i)
-    {
+    for (int i = 0; i < 100; ++i) {
         auto action = agent.best_choice();
     }
 
@@ -41,8 +39,7 @@ void solve()
 
 #endif
 
-    for (int i=0; i<100; ++i)
-    {
+    for (int i = 0; i < 100; ++i) {
         auto action = agent.best_choice();
         std::cout << action << std::endl;
 
@@ -50,16 +47,31 @@ void solve()
     }
 }
 
+void show(const dp::Game& game, DpView& viewer)
+{
+    sf::RenderWindow window(sf::VideoMode(800, 600), "Don't Panic!");
 
+    while (window.isOpen()) {
+        sf::Event event;
+        while (window.pollEvent(event)) {
+            if (event.type == sf::Event::Closed)
+                window.close();
+        }
+
+        window.clear();
+        window.draw(viewer);
+        window.display();
+    }
+}
 
 using namespace dp;
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[])
+{
 
 /// Running Offline
 #if RUNNING_OFFLINE
-    if (argc < 2)
-    {
+    if (argc < 2) {
         fmt::print(stderr, "USAGE: {} [Test number]\n", argv[0]);
         return EXIT_FAILURE;
     }
@@ -67,7 +79,7 @@ int main(int argc, char *argv[]) {
     std::string fn;
     fmt::format_to(std::back_inserter(fn), "../data/test{}.txt", argv[1]);
 
-    std::ifstream ifs{ fn.data() };
+    std::ifstream ifs { fn.data() };
 
     if (!ifs) {
         fmt::print("Failed to open input file {}", fn);
@@ -77,8 +89,12 @@ int main(int argc, char *argv[]) {
     Game game;
     game.init(ifs);
 
-    // game.view();
-    // fmt::print("{}\n", "Successfully initialized the view");
+    DpView viewer;
+    if (viewer.init(game, Resolution::Small)) {
+        show(game, viewer);
+    } else {
+        fmt::print("Failed to initialise the viewer");
+    }
 
 /// Running Online
 #else
@@ -98,6 +114,9 @@ int main(int argc, char *argv[]) {
     /// Main loop
     Agent::init(game);
     solve();
+
+    std::cerr << "Exiting program"
+              << std::endl;
 
     return EXIT_SUCCESS;
 }
