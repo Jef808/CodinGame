@@ -55,6 +55,17 @@ const GameParams* Game::get_params() const
     return &params;
 }
 
+State& Game::apply(Action a, State& s)
+{
+    s = *ps;
+
+
+
+    s.prev = ps;
+    ps = &s;
+    return s;
+}
+
 #if EXTRACTING_ONLINE_DATA
 #include <sstream>
 

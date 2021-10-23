@@ -1,19 +1,90 @@
 #define RUNNING_OFFLINE 1
 #define EXTRACTING_ONLINE_DATA 0
 
+#include <chrono>
 #include <fstream>
 #include <iostream>
 #include <string>
 #include <string_view>
+#include <thread>
 
 #include "agent.h"
 #include "dp.h"
-#include "view/dpview.h"
 
 #if RUNNING_OFFLINE
-#include <SFML/Graphics.hpp>
+#include "view/dpview.h"
+#include <SFML/Window/Event.hpp>
+#include <SFML/Graphics/RenderWindow.hpp>
 #include <fmt/format.h>
+
+void show(const dp::Game& game, DpView& viewer)
+{
+    sf::RenderWindow window(sf::VideoMode(800, 600), "Don't Panic!");
+
+    while (window.isOpen()) {
+        sf::Event event;
+        while (window.pollEvent(event)) {
+            if (event.type == sf::Event::Closed)
+                window.close();
+        }
+
+        window.clear();
+        window.draw(viewer);
+        window.display();
+
+        // std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+
+        // const dp::State* s = game.state();
+
+        // viewer.set_tile(s->pos + 1, s->floor, 7);
+
+        // window.clear();
+        // window.draw(viewer);
+        // window.display();
+
+        // std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+        // viewer.set_tile(s->pos + 1, s->floor, 0);
+        // viewer.set_tile(s->pos + 2, s->floor, 7);
+
+        // window.clear();
+        // window.draw(viewer);
+        // window.display();
+
+        // std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+        // viewer.set_tile(s->pos + 2, s->floor, 0);
+
+        // window.clear();
+        // window.draw(viewer);
+        // window.display();
+
+        // std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+        // viewer.set_tile(s->pos + 3, s->floor+1, 7);
+
+        // window.clear();
+        // window.draw(viewer);
+        // window.display();
+
+        // std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+        // viewer.set_tile(s->pos + 3, s->floor+1, 0);
+        // viewer.set_tile(s->pos + 4, s->floor+1, 7);
+        // viewer.set_tile(s->pos + 1, s->floor, 7);
+
+        // window.clear();
+        // window.draw(viewer);
+        // window.display();
+
+        // std::this_thread::sleep_for(std::chrono::milliseconds(3000));
+
+        // return;
+    }
+}
+
 #endif
+
 
 std::ostream& operator<<(std::ostream&, const dp::Action);
 
@@ -47,23 +118,6 @@ void solve()
     }
 }
 
-void show(const dp::Game& game, DpView& viewer)
-{
-    sf::RenderWindow window(sf::VideoMode(800, 600), "Don't Panic!");
-
-    while (window.isOpen()) {
-        sf::Event event;
-        while (window.pollEvent(event)) {
-            if (event.type == sf::Event::Closed)
-                window.close();
-        }
-
-        window.clear();
-        window.draw(viewer);
-        window.display();
-    }
-}
-
 using namespace dp;
 
 int main(int argc, char* argv[])
@@ -90,9 +144,12 @@ int main(int argc, char* argv[])
     game.init(ifs);
 
     DpView viewer;
-    if (viewer.init(game, Resolution::Small)) {
+    if (viewer.init(game, Resolution::Medium))
+    {
+        fmt::print("Successfully initialized the viewer");
         show(game, viewer);
-    } else {
+    }
+    else {
         fmt::print("Failed to initialise the viewer");
     }
 

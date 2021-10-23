@@ -42,6 +42,7 @@ struct State {
 };
 
 enum class Action {
+    None,
     Wait,
     Block,
     Elevator
@@ -51,6 +52,7 @@ class Game {
 public:
     Game() = default;
     void init(std::istream&);
+    State& apply(Action, State&);
     const State* state() const;
     const GameParams* get_params() const;
     const State& get_root_state() const;
