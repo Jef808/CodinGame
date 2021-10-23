@@ -1,0 +1,141 @@
+#include "view/dpview.h"
+#include "dp.h"
+#include "mgr.h"
+
+#include <chrono>
+#include <cassert>
+#include <iostream>
+#include <fstream>
+#include <thread>
+#include <random>
+
+
+#include <fmt/format.h>
+#include <SFML/Window/Event.hpp>
+#include <SFML/Graphics/RenderWindow.hpp>
+
+using namespace dp;
+
+void main_loop(DpMgr& mgr)
+{
+    while (true)
+    {
+        if (mgr.pre_input())
+        {
+            // output state here
+
+            Action a = Action::Wait;
+
+            mgr.input(a, std::cerr);
+
+            mgr.post_input();
+        }
+
+        switch(mgr.status) {
+            case DpMgr::status::Won:
+                std::cout << "Success!"
+                          << std::endl;
+                return;
+            case DpMgr::status::Lost:
+                std::cout << "Game over"
+                          << std::endl;
+                return;
+            case DpMgr::status::Error:
+                std::cout << "Error"
+                          << std::endl;
+                return;
+            default:
+                continue;
+        }
+    }
+}
+
+
+int main(int argc, char* argv[])
+{
+    if (argc < 2) {
+        fmt::print(stderr, "USAGE: {} [Test number]\n", argv[0]);
+        return EXIT_FAILURE;
+    }
+
+    std::string fn;
+    fmt::format_to(std::back_inserter(fn), "../data/test{}.txt", argv[1]);
+
+    std::ifstream ifs { fn.data() };
+
+    if (!ifs) {
+        fmt::print("Failed to open input file {}", fn);
+        return EXIT_FAILURE;
+    }
+
+    Game game;
+    game.init(ifs);
+
+    DpMgr mgr;
+    mgr.load(game);
+    assert(mgr.status == DpMgr::status::Initialized);
+
+    DpView viewer;
+    if (!viewer.init(game, Resolution::Medium))
+    {
+        fmt::print("Failed to initialise the viewer");
+    }
+
+    sf::RenderWindow window(sf::VideoMode(800, 600), "Don't Panic!");
+
+    while (window.isOpen())
+    {
+        sf::Event event;
+        while (window.pollEvent(event))
+        {
+            if (event.type == sf::Event::Closed)
+                window.close();
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(400));
+
+        window.clear();
+        window.draw(viewer);
+        window.display();
+
+        // Do some work to get actions here
+
+        if (mgr.pre_input())
+        {
+            Action action = Action::Wait;
+
+            if (!mgr.input(action, std::cerr))
+            {
+                // Action is invalid but game not lost
+                if (!mgr.input(Action::Elevator, std::cerr))
+                {
+                    if (!mgr.input(Action::Block, std::cerr))
+                    {
+                        std::cerr << "No valid actions..."
+                            << std::endl;
+
+                        window.close();
+
+                        return EXIT_FAILURE;
+                    }
+                }
+            }
+
+            // Process the new state
+            mgr.post_input();
+
+            viewer.update(mgr.dump_data());
+        }
+        else
+        {
+            std::cerr << "Game over"
+                << std::endl;
+
+            window.close();
+
+            return EXIT_SUCCESS;
+        }
+    }
+
+    return 0;
+}

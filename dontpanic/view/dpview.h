@@ -18,8 +18,7 @@ enum class Resolution {
 namespace dp {
 class Game;
 struct GameParams;
-struct State;
-enum class Action;
+struct DpData;
 }
 
 namespace sf {
@@ -31,9 +30,7 @@ class DpView : public sf::Drawable {
 public:
 
     bool init(const dp::Game& game, Resolution resolution = Resolution::Small, int history_length = 50);
-    void update(const dp::State& state);
-
-    void set_tile(int floor, int pos, int tile);
+    void update(std::shared_ptr<dp::DpData> data);
 
     virtual void draw(sf::RenderTarget& window, sf::RenderStates states) const;
 

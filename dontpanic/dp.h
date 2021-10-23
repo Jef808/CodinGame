@@ -13,9 +13,26 @@ constexpr int max_n_clones = 50;
 constexpr int max_n_elevators = 100;
 constexpr int max_time_ms = 100;
 
+enum class cell_t {
+    Empty,
+    WallL,
+    WallR,
+    Elevator,
+    Entry,
+    Exit,
+    Nb = 6
+};
+
 struct Elevator {
     int floor;
     int pos;
+};
+
+struct Clone {
+    int pos;
+    int floor;
+    enum { Right,
+        Left } dir;
 };
 
 struct GameParams {

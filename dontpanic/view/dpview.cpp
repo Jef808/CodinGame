@@ -1,5 +1,6 @@
 #include "dpview.h"
 #include "dp.h"
+#include "mgr.h"
 
 #include <string_view>
 
@@ -42,33 +43,6 @@ bool DpView::init(const dp::Game& game, Resolution resolution, int history_lengt
 
         }
 
-    update(*game.state());
-
-    return true;
-}
-
-void DpView::set_tile(int pos, int floor, int tile)
-{
-    int i = height - 1 - floor;
-    int j = pos + 1;
-
-    m_buffer[i * width + j] = tile;
-
-    sf::Vertex* quad = &m_vertices[(i * width + j) * 4];
-
-    // the row/column coordinates of the target texture tile
-    int tx = tile % (m_tileset.getSize().x / tile_size);
-    int ty = tile / (m_tileset.getSize().x / tile_size);
-
-    // make the quad point to the corresponding squares in the texture itself
-    quad[0].texCoords = sf::Vector2f(tx * tile_size, ty * tile_size);
-    quad[1].texCoords = sf::Vector2f((tx + 1) * tile_size, ty * tile_size);
-    quad[2].texCoords = sf::Vector2f((tx + 1) * tile_size, (ty + 1) * tile_size);
-    quad[3].texCoords = sf::Vector2f(tx * tile_size, (ty + 1) * tile_size);
-}
-
-/// TODO: This can be done only with a GameParams object.
-void DpView::update(const dp::State& state) {
     m_buffer.clear();
     m_buffer.reserve(width * height);
     std::fill_n(std::back_inserter(m_buffer), width * height, 0);
@@ -104,6 +78,29 @@ void DpView::update(const dp::State& state) {
             quad[2].texCoords = sf::Vector2f((tx + 1) * tile_size, (ty + 1) * tile_size);
             quad[3].texCoords = sf::Vector2f(tx * tile_size, (ty + 1) * tile_size);
         }
+
+    return true;
+}
+
+// 6: cloneL, 7: cloneR
+void DpView::update(std::shared_ptr<dp::DpData> data)
+{
+    for (const auto& c : data->clones)
+    {
+        int code = c.dir == dp::Clone::Right ? 7 : 6;
+
+        sf::Vertex* quad = &m_vertices[((c.pos + 1) + (width * c.floor)) * 4];
+
+        // the row/column coordinates of the target texture tile
+        int tx = code % (m_tileset.getSize().x / tile_size);
+        int ty = code / (m_tileset.getSize().x / tile_size);
+
+        // make the quad point to the corresponding squares in the texture itself
+        quad[0].texCoords = sf::Vector2f(tx * tile_size, ty * tile_size);
+        quad[1].texCoords = sf::Vector2f((tx + 1) * tile_size, ty * tile_size);
+        quad[2].texCoords = sf::Vector2f((tx + 1) * tile_size, (ty + 1) * tile_size);
+        quad[3].texCoords = sf::Vector2f(tx * tile_size, (ty + 1) * tile_size);
+    }
 }
 
 void DpView::draw(sf::RenderTarget& target, sf::RenderStates states) const
