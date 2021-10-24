@@ -76,12 +76,15 @@ int main(int argc, char* argv[])
     assert(mgr.status == DpMgr::status::Initialized);
 
     DpView viewer;
-    if (!viewer.init(game, Resolution::Medium))
+    if (!viewer.init(game, Resolution::Small))
     {
         fmt::print("Failed to initialise the viewer");
     }
 
     sf::RenderWindow window(sf::VideoMode(800, 600), "Don't Panic!");
+
+    Action action;
+    int action_i;
 
     while (window.isOpen())
     {
@@ -92,39 +95,82 @@ int main(int argc, char* argv[])
                 window.close();
         }
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(400));
-
         window.clear();
         window.draw(viewer);
         window.display();
 
         // Do some work to get actions here
-
         if (mgr.pre_input())
         {
-            Action action = Action::Wait;
+            action_i = -1;
+            while (action_i < 0 || action_i > 4) {
+                std::cout << "1: Wait, 2: Block, 3: Elevator, 0: quit"
+                          << std::endl;
+                std::cin >> action_i;
+                std::cin.ignore();
+            }
+            if (action_i == 0) {
+                window.close();
+                return EXIT_SUCCESS;
+            }
+            // action_i = std::rand() % 3;
+            // action = Action(action_i);
 
-            if (!mgr.input(action, std::cerr))
+            if (!mgr.input(Action(action_i), std::cerr))
             {
-                // Action is invalid but game not lost
-                if (!mgr.input(Action::Elevator, std::cerr))
-                {
-                    if (!mgr.input(Action::Block, std::cerr))
-                    {
-                        std::cerr << "No valid actions..."
-                            << std::endl;
+                std::cout << "Invalid action, one more change...\n" << std::endl;
 
-                        window.close();
-
-                        return EXIT_FAILURE;
-                    }
+                action_i = -1;
+                while (action_i < 0 || action_i > 4) {
+                    std::cout << "1: Wait, 2: Block, 3: Elevator, 4: quit"
+                              << std::endl;
+                    std::cin >> action_i;
+                    std::cin.ignore();
                 }
+
+                if (action_i == 4 || !mgr.input(Action(action_i), std::cerr)) {
+                    std::cout << "Exiting program"
+                        << std::endl;
+                    window.close();
+                    return EXIT_SUCCESS;
+                }
+
+                // +-1
+                // int s = 2 * std::rand() % 2 - 1;
+                // bool ok = false;
+
+                // for (int i=0; i<3; ++i) {
+                //     Action a = s == 1 ? Action(i) : Action(2-i);
+                //     if (mgr.input(a, std::cerr)) {
+                //         action = a;
+                //         ok = true;
+                //         break;
+                //     }
+                // }
+
+                // if (!ok) {
+                //     std::cerr << "No valid actions..."
+                //               << std::endl;
+
+                //     window.close();
+
+                //     return EXIT_FAILURE;
+                // }
             }
 
             // Process the new state
             mgr.post_input();
 
-            viewer.update(mgr.dump_data());
+            viewer.update(mgr.dump());
+
+            if (mgr.status == DpMgr::status::Won) {
+                std::cout << "Game Won!!!"
+                    << std::endl;
+
+                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+                window.close();
+                return EXIT_SUCCESS;
+            }
         }
         else
         {

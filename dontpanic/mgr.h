@@ -2,24 +2,24 @@
 #define MGR_H_
 
 #include "dp.h"
+
 #include <deque>
 #include <iosfwd>
-#include <memory>
 #include <vector>
 
 namespace dp {
 
-struct DpData
-{
-    std::vector<Clone> clones;
-    std::vector<Elevator> player_elevators;
-    std::vector<Clone> blocked_clones;
+struct Data {
+    using iterator = std::vector<Entity>::const_iterator;
+    std::vector<Entity> entities;
+    int n_clones;
+    int n_player_elevators;
+    int n_blocked_clones;
 };
 
 class DpMgr
 {
 public:
-
     enum class status { Uninitialized,
         Initialized,
         Ongoing,
@@ -35,31 +35,32 @@ public:
 
     void post_input();
 
-    std::shared_ptr<DpData> dump_data();
+    const Data* dump() const;
 
 private:
 
     std::vector<cell_t> m_grid;
-    std::deque<Clone> m_clones;
-    std::vector<Elevator> player_elevators;
-    std::vector<Clone> blocked_clones;
+    std::deque<Entity> m_clones;
+    std::vector<Entity> player_elevators;
+    std::vector<Entity> blocked_clones;
     const GameParams* prm;
 
-    std::shared_ptr<DpData> shared_data;
+    mutable Data data;
 
     int width;
     int height;
     int n_turns;
     int elevators_used;
     int clones_spawned;
-    int spawn_cd = 0;
+    int spawn_cd;
 
     void advance_clones();
-    bool at_wall(const Clone& c);
-    bool at_elevator(const Clone& c);
-    bool should_reverse(const Clone& c);
+    bool at_wall(const Entity& c);
+    bool at_elevator(const Entity& c);
+    bool should_reverse(const Entity& c);
 
 };
+
 
 }  // namespace dp
 

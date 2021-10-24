@@ -43,34 +43,41 @@ bool DpView::init(const dp::Game& game, Resolution resolution, int history_lengt
 
         }
 
-    m_buffer.clear();
-    m_buffer.reserve(width * height);
-    std::fill_n(std::back_inserter(m_buffer), width * height, 0);
+    m_background.clear();
+    m_background.reserve(width * height);
+    std::fill_n(std::back_inserter(m_background), width * height, 0);
 
     // add the walls
     for (int i = 0; i < height; ++i) {
-        m_buffer[i * width] = 1;
-        m_buffer[(i+1) * width - 1] = 2;
+        m_background[i * width] = 1;
+        m_background[(i+1) * width - 1] = 2;
     }
 
     // add the elevators
     for (const auto& el : m_params->elevators) {
-        m_buffer[(height - 1 - el.floor) * width + (el.pos + 1)] = 5;
+        m_background[(height - 1 - el.floor) * width + (el.pos + 1)] = 5;
     }
 
     // add the entry and exit
     int in_p = m_params->entry_pos, out_p = m_params->exit_pos, out_f = m_params->exit_floor;
-    m_buffer[(height - 1) * width + (in_p + 1)] = 3;
-    m_buffer[(height - 1 - out_f) * width + (out_p + 1)] = 4;
+    m_background[(height - 1) * width + (in_p + 1)] = 3;
+    m_background[(height - 1 - out_f) * width + (out_p + 1)] = 4;
 
+    set(m_background);
+
+    return true;
+}
+
+void DpView::set(const std::vector<int>& buffer)
+{
     for (int i = 0; i < height; ++i)
         for (int j = 0; j < width; ++j) {
 
             sf::Vertex* quad = &m_vertices[(i * width + j) * 4];
 
             // the row/column coordinates of the target texture tile
-            int tx = m_buffer[i * width + j] % (m_tileset.getSize().x / tile_size);
-            int ty = m_buffer[i * width + j] / (m_tileset.getSize().x / tile_size);
+            int tx = buffer[i * width + j] % (m_tileset.getSize().x / tile_size);
+            int ty = buffer[i * width + j] / (m_tileset.getSize().x / tile_size);
 
             // make the quad point to the corresponding squares in the texture itself
             quad[0].texCoords = sf::Vector2f(tx * tile_size, ty * tile_size);
@@ -78,29 +85,88 @@ bool DpView::init(const dp::Game& game, Resolution resolution, int history_lengt
             quad[2].texCoords = sf::Vector2f((tx + 1) * tile_size, (ty + 1) * tile_size);
             quad[3].texCoords = sf::Vector2f(tx * tile_size, (ty + 1) * tile_size);
         }
-
-    return true;
 }
 
 // 6: cloneL, 7: cloneR
-void DpView::update(std::shared_ptr<dp::DpData> data)
+void DpView::update(const dp::Data* data)
 {
-    for (const auto& c : data->clones)
-    {
-        int code = c.dir == dp::Clone::Right ? 7 : 6;
+    m_buffer.clear();
+    std::copy(m_background.begin(), m_background.end(), std::back_inserter(m_buffer));
 
-        sf::Vertex* quad = &m_vertices[((c.pos + 1) + (width * c.floor)) * 4];
+    auto it_clones = data->entities.begin();
+    auto it_elevators = it_clones + data->n_clones;
+    auto it_blocked_clones = it_elevators + data->n_player_elevators;
+    auto it_end = it_blocked_clones + data->n_blocked_clones;
 
-        // the row/column coordinates of the target texture tile
-        int tx = code % (m_tileset.getSize().x / tile_size);
-        int ty = code / (m_tileset.getSize().x / tile_size);
+    auto ndx = [w=width, h=m_params->height](int pos, int floor){ return (pos + 1) + w * (h - 1 - floor); };
 
-        // make the quad point to the corresponding squares in the texture itself
-        quad[0].texCoords = sf::Vector2f(tx * tile_size, ty * tile_size);
-        quad[1].texCoords = sf::Vector2f((tx + 1) * tile_size, ty * tile_size);
-        quad[2].texCoords = sf::Vector2f((tx + 1) * tile_size, (ty + 1) * tile_size);
-        quad[3].texCoords = sf::Vector2f(tx * tile_size, (ty + 1) * tile_size);
-    }
+    std::for_each(it_clones, it_elevators, [&](const auto& clone){
+        m_buffer[ndx(clone.pos, clone.floor)] = clone.dir == dp::Dir::Left ? 6 : 7;
+    });
+
+    std::for_each(it_elevators, it_blocked_clones, [&](const auto& clone){
+        m_buffer[ndx(clone.pos, clone.floor)] = 5;
+    });
+
+    std::for_each(it_blocked_clones, it_end, [&](const auto& clone){
+        m_buffer[ndx(clone.pos, clone.floor)] = clone.dir == dp::Dir::Left ? 7 : 6;
+    });
+
+    set(m_buffer);
+
+    // for (; it_clones != it_elevators; ++it_clones)
+    // {
+    //     int code = *(it_clones->dir) == dp::Dir::Left ? 6 : 7;
+
+    //     int pos = it_clones->pos + 1, floor = m_params->height - it_clones->floor - 1;
+    //     sf::Vertex* quad = &m_vertices[(pos + width * floor) * 4];
+
+    //     // the row/column coordinates of the target texture tile
+    //     int tx = code % (m_tileset.getSize().x / tile_size);
+    //     int ty = code / (m_tileset.getSize().x / tile_size);
+
+    //     // make the quad point to the corresponding squares in the texture itself
+    //     quad[0].texCoords = sf::Vector2f(tx * tile_size, ty * tile_size);
+    //     quad[1].texCoords = sf::Vector2f((tx + 1) * tile_size, ty * tile_size);
+    //     quad[2].texCoords = sf::Vector2f((tx + 1) * tile_size, (ty + 1) * tile_size);
+    //     quad[3].texCoords = sf::Vector2f(tx * tile_size, (ty + 1) * tile_size);
+    // }
+
+    // for (; it_elevators != it_blocked_clones; ++it_elevators)
+    // {
+    //     int code = 5;
+
+    //     int pos = it_clones->pos + 1, floor = m_params->height - it_clones->floor - 1;
+    //     sf::Vertex* quad = &m_vertices[(pos + width * floor) * 4];
+
+    //     // the row/column coordinates of the target texture tile
+    //     int tx = code % (m_tileset.getSize().x / tile_size);
+    //     int ty = code / (m_tileset.getSize().x / tile_size);
+
+    //     // make the quad point to the corresponding squares in the texture itself
+    //     quad[0].texCoords = sf::Vector2f(tx * tile_size, ty * tile_size);
+    //     quad[1].texCoords = sf::Vector2f((tx + 1) * tile_size, ty * tile_size);
+    //     quad[2].texCoords = sf::Vector2f((tx + 1) * tile_size, (ty + 1) * tile_size);
+    //     quad[3].texCoords = sf::Vector2f(tx * tile_size, (ty + 1) * tile_size);
+    // }
+
+    // for (; it_blocked_clones != it_end; ++it_blocked_clones)
+    // {
+    //     int code = *it_blocked_clones->dir == dp::Dir::Left ? 7 : 6;
+
+    //     int pos = it_clones->pos + 1, floor = m_params->height - it_clones->floor - 1;
+    //     sf::Vertex* quad = &m_vertices[(pos + width * floor) * 4];
+
+    //     // the row/column coordinates of the target texture tile
+    //     int tx = code % (m_tileset.getSize().x / tile_size);
+    //     int ty = code / (m_tileset.getSize().x / tile_size);
+
+    //     // make the quad point to the corresponding squares in the texture itself
+    //     quad[0].texCoords = sf::Vector2f(tx * tile_size, ty * tile_size);
+    //     quad[1].texCoords = sf::Vector2f((tx + 1) * tile_size, ty * tile_size);
+    //     quad[2].texCoords = sf::Vector2f((tx + 1) * tile_size, (ty + 1) * tile_size);
+    //     quad[3].texCoords = sf::Vector2f(tx * tile_size, (ty + 1) * tile_size);
+    // }
 }
 
 void DpView::draw(sf::RenderTarget& target, sf::RenderStates states) const

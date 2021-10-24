@@ -5,20 +5,24 @@
 #include <cassert>
 #include <deque>
 #include <fstream>
+#include <functional>
 #include <iostream>
+#include <optional>
 #include <vector>
 
 namespace dp {
 
-Clone& reverse(Clone& clone)
+Entity& reverse(Entity& clone)
 {
-    clone.dir = Clone::Right ? Clone::Left : Clone::Right;
+    assert (clone.type == Type::Clone);
+    clone.dir = std::make_optional(*clone.dir == Dir::Right ? Dir::Left : Dir::Right);
     return clone;
 }
 
-int pos_front(const Clone& clone)
+int pos_front(const Entity& clone)
 {
-    return clone.dir == Clone::Right ? clone.pos + 1 : clone.pos - 1;
+    assert(clone.type == Type::Clone);
+    return *clone.dir == Dir::Right ? clone.pos + 1 : clone.pos - 1;
 }
 
 void dp::DpMgr::load(Game& game)
@@ -46,6 +50,8 @@ void dp::DpMgr::load(Game& game)
     m_grid[prm->entry_pos + 1] = cell_t::Entry;
     m_grid[prm->exit_pos + prm->exit_floor * width] = cell_t::Exit;
 
+    n_turns = elevators_used = clones_spawned = spawn_cd = 0;
+
     status = status::Initialized;
 }
 
@@ -60,7 +66,7 @@ bool DpMgr::pre_input()
 
     if (clones_spawned < prm->max_clones) {
         if (spawn_cd == 0) {
-            Clone spawn { prm->entry_pos, 0, Clone::Right };
+            Entity spawn { Type::Clone, prm->entry_pos, 0, std::make_optional(Dir::Right) };
             m_clones.push_back(spawn);
             ++clones_spawned;
             spawn_cd = 3;
@@ -88,7 +94,7 @@ bool DpMgr::input(Action a, std::ostream& _err = std::cerr)
         return false;
     }
 
-    Clone clone = m_clones.front();
+    Entity clone = m_clones.front();
     cell_t cell = m_grid[(clone.pos + 1) + (clone.floor * width)];
 
     if (a == Action::Elevator) {
@@ -103,7 +109,7 @@ bool DpMgr::input(Action a, std::ostream& _err = std::cerr)
             status = status::Error;
             return false;
         } else {
-            Elevator new_elev { clone.pos, clone.floor };
+            Entity new_elev { Type::Elevator, clone.pos, clone.floor };
             player_elevators.push_back(new_elev);
             m_clones.pop_front();
             ++elevators_used;
@@ -145,13 +151,13 @@ void DpMgr::advance_clones()
     }
 }
 
-bool DpMgr::at_wall(const Clone& c)
+bool DpMgr::at_wall(const Entity& c)
 {
     int mod = c.pos % width;
     return mod == 0 || mod == width;
 }
 
-bool DpMgr::at_elevator(const Clone& c)
+bool DpMgr::at_elevator(const Entity& c)
 {
     return (std::find_if(prm->elevators.begin(), prm->elevators.end(), [&c](const auto& e) {
         return e.floor == c.floor && e.pos == c.pos;
@@ -162,24 +168,26 @@ bool DpMgr::at_elevator(const Clone& c)
             != player_elevators.end());
 }
 
-bool DpMgr::should_reverse(const Clone& c)
+bool DpMgr::should_reverse(const Entity& c)
 {
     return std::find_if(blocked_clones.begin(), blocked_clones.end(), [&c](const auto& b) {
         return b.floor == c.floor && (b.pos == pos_front(c) || b.pos == c.pos);
     }) != blocked_clones.end();
 }
 
-std::shared_ptr<DpData> DpMgr::dump_data()
+const Data* DpMgr::dump() const
 {
-    shared_data->clones.clear();
-    player_elevators.clear();
-    blocked_clones.clear();
+    data.entities.clear();
 
-    std::copy(this->m_clones.begin(), this->m_clones.end(), std::back_inserter(shared_data->clones));
-    shared_data->player_elevators = this->player_elevators;
-    shared_data->blocked_clones = this->blocked_clones;
+    std::copy(m_clones.begin(), m_clones.end(), std::back_inserter(data.entities));
+    std::copy(player_elevators.begin(), player_elevators.end(), std::back_inserter(data.entities));
+    std::copy(blocked_clones.begin(), blocked_clones.end(), std::back_inserter(data.entities));
 
-    return shared_data;
+    data.n_clones = m_clones.size();
+    data.n_player_elevators = player_elevators.size();
+    data.n_blocked_clones = blocked_clones.size();
+
+    return &data;
 }
 
 } // namespace dp

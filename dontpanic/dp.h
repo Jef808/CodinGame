@@ -2,6 +2,7 @@
 #define DP_H_
 
 #include <iosfwd>
+#include <optional>
 #include <vector>
 
 namespace dp {
@@ -23,16 +24,13 @@ enum class cell_t {
     Nb = 6
 };
 
-struct Elevator {
-    int floor;
-    int pos;
-};
-
-struct Clone {
+enum class Type { Elevator, Clone };
+enum class Dir { Right, Left };
+struct Entity {
+    Type type;
     int pos;
     int floor;
-    enum { Right,
-        Left } dir;
+    std::optional<Dir> dir;
 };
 
 struct GameParams {
@@ -44,7 +42,7 @@ struct GameParams {
     int max_clones;
     int n_add_elevators;
     int entry_pos;
-    std::vector<Elevator> elevators;
+    std::vector<Entity> elevators;
 };
 
 struct State {
