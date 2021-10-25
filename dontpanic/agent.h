@@ -8,9 +8,10 @@ enum class Action;
 
 class Agent {
 public:
-    static void init(const dp::Game&);
 
     Agent() = default;
+
+    void init(const dp::Game&);
 
     /// The main search method
     void search();

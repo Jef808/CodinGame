@@ -17,7 +17,6 @@ namespace {
 
 void Game::init(std::istream& _in)
 {
-    ps = &root_state;
     int n_elevators;
     _in >> params.height
         >> params.width
@@ -33,13 +32,17 @@ void Game::init(std::istream& _in)
         _in >> el.floor >> el.pos;
     }
 
+    ps = &root_state;
+
     // First turn because not everything is initialized
     char d;
     _in >> ps->floor >> ps->pos >> d;
     _in.ignore();
 
-    ps->dir = (d == 'L' ? State::Left : State::Right);
-    ps->turn = 1;
+    ps->dir = (d == 'L' ? Dir::Left : Dir::Right);
+    ps->clones = params.max_clones;
+    ps->player_elevators = params.n_add_elevators;
+    ps->turn = params.max_round;
 
     params.entry_pos = ps->pos;
 
@@ -53,17 +56,6 @@ void Game::init(std::istream& _in)
 const GameParams* Game::get_params() const
 {
     return &params;
-}
-
-State& Game::apply(Action a, State& s)
-{
-    s = *ps;
-
-
-
-    s.prev = ps;
-    ps = &s;
-    return s;
 }
 
 #if EXTRACTING_ONLINE_DATA
@@ -96,7 +88,7 @@ void extract_online_init()
     ss << ps->floor << ' '
        << ps->pos << ' '
        << d;
-    << (d == 'L' ? State::Left : State::Right)
+    << (d == 'L' ? Dir::Left : Dir::Right)
     << '\n';
 
     out << ss.str() << std::endl;

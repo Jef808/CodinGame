@@ -12,81 +12,22 @@
 #include "dp.h"
 
 #if RUNNING_OFFLINE
-#include "view/dpview.h"
-#include <SFML/Window/Event.hpp>
-#include <SFML/Graphics/RenderWindow.hpp>
 #include <fmt/format.h>
-
-void show(const dp::Game& game, DpView& viewer)
-{
-    sf::RenderWindow window(sf::VideoMode(800, 600), "Don't Panic!");
-
-    while (window.isOpen()) {
-        sf::Event event;
-        while (window.pollEvent(event)) {
-            if (event.type == sf::Event::Closed)
-                window.close();
-        }
-
-        window.clear();
-        window.draw(viewer);
-        window.display();
-
-        // std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-
-        // const dp::State* s = game.state();
-
-        // viewer.set_tile(s->pos + 1, s->floor, 7);
-
-        // window.clear();
-        // window.draw(viewer);
-        // window.display();
-
-        // std::this_thread::sleep_for(std::chrono::milliseconds(500));
-
-        // viewer.set_tile(s->pos + 1, s->floor, 0);
-        // viewer.set_tile(s->pos + 2, s->floor, 7);
-
-        // window.clear();
-        // window.draw(viewer);
-        // window.display();
-
-        // std::this_thread::sleep_for(std::chrono::milliseconds(500));
-
-        // viewer.set_tile(s->pos + 2, s->floor, 0);
-
-        // window.clear();
-        // window.draw(viewer);
-        // window.display();
-
-        // std::this_thread::sleep_for(std::chrono::milliseconds(500));
-
-        // viewer.set_tile(s->pos + 3, s->floor+1, 7);
-
-        // window.clear();
-        // window.draw(viewer);
-        // window.display();
-
-        // std::this_thread::sleep_for(std::chrono::milliseconds(500));
-
-        // viewer.set_tile(s->pos + 3, s->floor+1, 0);
-        // viewer.set_tile(s->pos + 4, s->floor+1, 7);
-        // viewer.set_tile(s->pos + 1, s->floor, 7);
-
-        // window.clear();
-        // window.draw(viewer);
-        // window.display();
-
-        // std::this_thread::sleep_for(std::chrono::milliseconds(3000));
-
-        // return;
-    }
-}
-
 #endif
 
-
-std::ostream& operator<<(std::ostream&, const dp::Action);
+std::ostream& operator<<(std::ostream& _out, const dp::Action a)
+{
+    switch (a) {
+        case dp::Action::Wait:
+            return _out << "WAIT";
+        case dp::Action::Block:
+            return _out << "BLOCK";
+        case dp::Action::Elevator:
+            return _out << "ELEVATOR";
+        default:
+            return throw "Action::None", _out << "WARNING: Chose Action::None";
+    }
+}
 
 void ignore_turn(std::istream& _in)
 {
@@ -96,33 +37,10 @@ void ignore_turn(std::istream& _in)
     _in.ignore();
 }
 
-void solve()
-{
-    Agent agent;
-
-#if RUNNING_OFFLINE
-
-    for (int i = 0; i < 100; ++i) {
-        auto action = agent.best_choice();
-    }
-
-    return;
-
-#endif
-
-    for (int i = 0; i < 100; ++i) {
-        auto action = agent.best_choice();
-        std::cout << action << std::endl;
-
-        ignore_turn(std::cin);
-    }
-}
-
 using namespace dp;
 
 int main(int argc, char* argv[])
 {
-
 /// Running Offline
 #if RUNNING_OFFLINE
     if (argc < 2) {
@@ -136,22 +54,12 @@ int main(int argc, char* argv[])
     std::ifstream ifs { fn.data() };
 
     if (!ifs) {
-        fmt::print("Failed to open input file {}", fn);
+        fmt::print("Failed to open input file {}\n", fn);
         return EXIT_FAILURE;
     }
 
     Game game;
     game.init(ifs);
-
-    DpView viewer;
-    if (viewer.init(game, Resolution::Medium))
-    {
-        fmt::print("Successfully initialized the viewer");
-        show(game, viewer);
-    }
-    else {
-        fmt::print("Failed to initialise the viewer");
-    }
 
 /// Running Online
 #else
@@ -169,8 +77,20 @@ int main(int argc, char* argv[])
 #endif
 
     /// Main loop
-    Agent::init(game);
-    solve();
+    Agent agent;
+    agent.init(game);
+
+    agent.search();
+
+    bool done = false;
+    while (!done) {
+        Action action = agent.best_choice();
+        done = action == Action::None;
+        if (done)
+            break;
+        std::cout << action
+                  << std::endl;
+    }
 
     std::cerr << "Exiting program"
               << std::endl;

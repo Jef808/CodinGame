@@ -134,28 +134,6 @@ int main(int argc, char* argv[])
                     window.close();
                     return EXIT_SUCCESS;
                 }
-
-                // +-1
-                // int s = 2 * std::rand() % 2 - 1;
-                // bool ok = false;
-
-                // for (int i=0; i<3; ++i) {
-                //     Action a = s == 1 ? Action(i) : Action(2-i);
-                //     if (mgr.input(a, std::cerr)) {
-                //         action = a;
-                //         ok = true;
-                //         break;
-                //     }
-                // }
-
-                // if (!ok) {
-                //     std::cerr << "No valid actions..."
-                //               << std::endl;
-
-                //     window.close();
-
-                //     return EXIT_FAILURE;
-                // }
             }
 
             // Process the new state
