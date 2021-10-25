@@ -4,13 +4,8 @@
 namespace dp {
 class Game;
 enum class Action;
-}
 
-class Agent {
-public:
-
-    Agent() = default;
-
+namespace agent {
     void init(const dp::Game&);
 
     /// The main search method
@@ -18,6 +13,8 @@ public:
 
     /// The best choice to date
     dp::Action best_choice();
-};
+
+}  // namespace agent
+}  // namespace dp
 
 #endif // AGENT_H_

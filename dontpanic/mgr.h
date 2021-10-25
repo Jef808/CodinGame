@@ -27,7 +27,7 @@ public:
         Won,
         Error } status;
 
-    void load(Game& game);
+    void load(const Game& game);
 
     bool pre_input();
 
@@ -57,6 +57,7 @@ private:
     void advance_clones();
     bool at_wall(const Entity& c);
     bool at_elevator(const Entity& c);
+    bool at_blocked(const Entity& c);
     bool should_reverse(const Entity& c);
 
 };

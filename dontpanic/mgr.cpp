@@ -25,7 +25,7 @@ int pos_front(const Entity& clone)
     return *clone.dir == Dir::Right ? clone.pos + 1 : clone.pos - 1;
 }
 
-void dp::DpMgr::load(Game& game)
+void DpMgr::load(const Game& game)
 {
     prm = game.get_params();
     width = prm->width + 2;
@@ -48,7 +48,7 @@ void dp::DpMgr::load(Game& game)
 
     // add the entry and exit
     m_grid[prm->entry_pos + 1] = cell_t::Entry;
-    m_grid[prm->exit_pos + prm->exit_floor * width] = cell_t::Exit;
+    m_grid[prm->exit_pos + 1 + prm->exit_floor * width] = cell_t::Exit;
 
     n_turns = elevators_used = clones_spawned = spawn_cd = 0;
 
@@ -59,9 +59,20 @@ bool DpMgr::pre_input()
 {
     ++n_turns;
 
-    if (n_turns > prm->max_round) {
+    if (n_turns > prm->max_round)
         status = status::Lost;
-        return false;
+
+    switch(status) {
+        case status::Initialized:
+            status = status::Ongoing;
+        case status::Ongoing:
+            break;
+        case status::Won:
+        case status::Lost:
+        case status::Error:
+        case status::Uninitialized:
+            return false;
+        default: assert(false);
     }
 
     if (clones_spawned < prm->max_clones) {
@@ -71,7 +82,6 @@ bool DpMgr::pre_input()
             ++clones_spawned;
             spawn_cd = 3;
         }
-
         --spawn_cd;
     }
 
@@ -80,6 +90,7 @@ bool DpMgr::pre_input()
 
 bool DpMgr::input(Action a, std::ostream& _err = std::cerr)
 {
+    assert(a != Action::None);
     assert(n_turns <= prm->max_round);
     assert(clones_spawned <= prm->max_clones);
     assert(elevators_used <= prm->n_add_elevators);
@@ -131,12 +142,14 @@ void DpMgr::post_input()
         && m_clones.front().pos == prm->exit_pos) {
         status = status::Won;
     }
+
+    // m_grid[m_clones.front().pos + 1 + m_clones.front().floor * width] == cell_t::Exit;
 }
 
 void DpMgr::advance_clones()
 {
     for (auto& clone : m_clones) {
-        if (at_elevator(clone)) {
+        if (at_elevator(clone) && !at_blocked(clone)) {
             ++clone.floor;
         } else {
             if (should_reverse(clone))
@@ -153,8 +166,7 @@ void DpMgr::advance_clones()
 
 bool DpMgr::at_wall(const Entity& c)
 {
-    int mod = c.pos % width;
-    return mod == 0 || mod == width;
+    return c.pos == -1 || c.pos == width - 2;
 }
 
 bool DpMgr::at_elevator(const Entity& c)
@@ -166,6 +178,13 @@ bool DpMgr::at_elevator(const Entity& c)
                return e.floor == c.floor && e.pos == c.pos;
            })
             != player_elevators.end());
+}
+
+bool DpMgr::at_blocked(const Entity& c)
+{
+    return std::find_if(blocked_clones.begin(), blocked_clones.end(), [&c](const auto& b){
+        return b.floor == c.floor && b.pos == c.pos;
+    }) != blocked_clones.end();
 }
 
 bool DpMgr::should_reverse(const Entity& c)

@@ -73,7 +73,7 @@ int main(int argc, char* argv[])
 
     DpMgr mgr;
     mgr.load(game);
-    assert(mgr.status == DpMgr::status::Initialized);
+    //assert(mgr.status == DpMgr::status::Initialized);
 
     DpView viewer;
     if (!viewer.init(game, Resolution::Small))

@@ -4,7 +4,7 @@ project( DontPanic )
 set( CMAKE_EXPORT_COMPILE_COMMANDS on )
 set( CMAKE_CXX_STANDARD 20 )
 set( CMAKE_CXX_STANDARD_REQUIRED 20 )
-set( CMAKE_BUILD_TYPE debug )
+set( CMAKE_BUILD_TYPE release )
 set( CMAKE_VERBOSE_MAKEFILE on )
 
 set( with_view on )
@@ -17,7 +17,6 @@ set( main_SOURCES
   )
 set( libs  )
 
-#set( data-dir ${CMAKE_SOURCE_DIR}/data )
 set( view_dir ${CMAKE_SOURCE_DIR}/view )
 
 if ( with_fmt )
@@ -29,13 +28,23 @@ if ( with_view )
   list( APPEND libs dpview )
 endif()
 
-add_executable( main ${main_SOURCES} )
+message( STATUS "Libraries:" ${libs} )
+
+add_executable( main main.cpp dp.cpp agent.cpp mgr.cpp)
 target_link_libraries( main ${libs} )
 target_include_directories( main PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} )
 
-add_executable( mgr_main mgr_main.cpp mgr.cpp dp.cpp )
-target_link_libraries( mgr_main ${libs} )
-target_include_directories( mgr_main PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} )
+add_executable( human_play mgr_main.cpp mgr.cpp dp.cpp )
+target_link_libraries( human_play ${libs} )
+target_include_directories( human_play PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} )
+
+add_executable( viewer viewer.cpp dp.cpp )
+target_link_libraries( viewer ${libs} )
+target_include_directories( viewer PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} )
+
+add_executable( cg_bundle bundled.cpp )
+target_link_libraries( cg_bundle fmt::fmt )
+target_include_directories( cg_bundle PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} )
 
 add_custom_command(
   TARGET main POST_BUILD
