@@ -6,10 +6,8 @@ class Game;
 enum class Action;
 
 namespace agent {
-    void init(const dp::Game&);
-
     /// The main search method
-    void search();
+    void search(const dp::Game&);
 
     /// The best choice to date
     dp::Action best_choice();

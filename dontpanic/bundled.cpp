@@ -184,10 +184,8 @@ class Game;
 enum class Action;
 
 namespace agent {
-    void init(const dp::Game&);
-
     /// The main search method
-    void search();
+    void search(const dp::Game&);
 
     /// The best choice to date
     dp::Action best_choice();
@@ -245,6 +243,8 @@ void init_elevators();
 /// Used to populate the candidates
 void init_actions();
 
+void init(const dp::Game& g);
+
 /// A queue for real Actions to be played
 std::deque<dp::Action> best_actions;
 
@@ -253,20 +253,6 @@ bool depth_first_search(const dp::State& s, int max_depth);
 } // namespace
 
 namespace dp::agent {
-
-void init(const dp::Game& g)
-{
-    std::fill(&states[0], &states[dp::max_turns], dp::State {});
-
-    gparams = g.get_params();
-    states[0] = *g.state();
-    ps = &states[1];
-
-    init_elevators();
-    init_actions();
-    cost_buffer.reserve(params.width);
-    std::fill_n(std::back_inserter(cost_buffer), params.width, cost_max);
-}
 
 dp::Action best_choice()
 {
@@ -278,10 +264,11 @@ dp::Action best_choice()
     return action;
 }
 
-void search()
+void search(const Game& game)
 {
     assert(ps == &states[1]);
 
+    init(game);
     bool found = depth_first_search(states[0], params.exit_floor);
 
     assert(found);
@@ -383,6 +370,20 @@ void init_actions()
                     ret.push_back(p);
             return ret;
         });
+}
+
+void init(const dp::Game& g)
+{
+    std::fill(&states[0], &states[dp::max_turns], dp::State {});
+
+    gparams = g.get_params();
+    states[0] = *g.state();
+    ps = &states[1];
+
+    init_elevators();
+    init_actions();
+    cost_buffer.reserve(params.width);
+    std::fill_n(std::back_inserter(cost_buffer), params.width, cost_max);
 }
 
 inline bool at_exit_floor(const State& s)
@@ -660,11 +661,9 @@ int main(int argc, char* argv[])
 
 #endif
 
-    agent::init(game);
-
     auto start = std::chrono::steady_clock::now();
 
-    agent::search();
+    agent::search(game);
 
     auto time = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start).count();
     std::cerr << std::setprecision(4)

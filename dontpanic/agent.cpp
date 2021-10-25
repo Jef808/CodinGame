@@ -50,6 +50,9 @@ void init_elevators();
 /// Used to populate the candidates
 void init_actions();
 
+/// Initialize the search
+void init(const dp::Game& g);
+
 /// A queue for real Actions to be played
 std::deque<dp::Action> best_actions;
 
@@ -58,20 +61,6 @@ bool depth_first_search(const dp::State& s, int max_depth);
 } // namespace
 
 namespace dp::agent {
-
-void init(const dp::Game& g)
-{
-    std::fill(&states[0], &states[dp::max_turns], dp::State {});
-
-    gparams = g.get_params();
-    states[0] = *g.state();
-    ps = &states[1];
-
-    init_elevators();
-    init_actions();
-    cost_buffer.reserve(gparams->width);
-    std::fill_n(std::back_inserter(cost_buffer), gparams->width, cost_max);
-}
 
 dp::Action best_choice()
 {
@@ -83,9 +72,11 @@ dp::Action best_choice()
     return action;
 }
 
-void search()
+void search(const Game& g)
 {
     assert(ps == &states[1]);
+
+    init(g);
 
     bool found = depth_first_search(states[0], gparams->exit_floor);
 
@@ -188,6 +179,20 @@ void init_actions()
                     ret.push_back(p);
             return ret;
         });
+}
+
+void init(const dp::Game& g)
+{
+    std::fill(&states[0], &states[dp::max_turns], dp::State {});
+
+    gparams = g.get_params();
+    states[0] = *g.state();
+    ps = &states[1];
+
+    init_elevators();
+    init_actions();
+    cost_buffer.reserve(gparams->width);
+    std::fill_n(std::back_inserter(cost_buffer), gparams->width, cost_max);
 }
 
 inline bool at_exit_floor(const State& s)

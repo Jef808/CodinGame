@@ -73,11 +73,9 @@ int main(int argc, char* argv[])
     Game game;
     game.init(ifs);
 
-    agent::init(game);
-
     auto start = std::chrono::steady_clock::now();
 
-    agent::search();
+    agent::search(game);
 
     auto time = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start).count();
     std::cerr << std::setprecision(4)
@@ -209,11 +207,9 @@ int main(int argc, char* argv[])
     Game game;
     game.init(std::cin);
 
-    agent::init(game);
-
     auto start = std::chrono::steady_clock::now();
 
-    agent::search();
+    agent::search(game);
 
     Action action = agent::best_choice();
     while (action != Action::None) {
