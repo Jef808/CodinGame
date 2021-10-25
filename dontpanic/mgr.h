@@ -17,8 +17,7 @@ struct Data {
     int n_blocked_clones;
 };
 
-class DpMgr
-{
+class DpMgr {
 public:
     enum class status { Uninitialized,
         Initialized,
@@ -38,7 +37,6 @@ public:
     const Data* dump() const;
 
 private:
-
     std::vector<cell_t> m_grid;
     std::deque<Entity> m_clones;
     std::vector<Entity> player_elevators;
@@ -59,11 +57,8 @@ private:
     bool at_elevator(const Entity& c);
     bool at_blocked(const Entity& c);
     bool should_reverse(const Entity& c);
-
 };
 
-
-}  // namespace dp
-
+} // namespace dp
 
 #endif // MGR_H_

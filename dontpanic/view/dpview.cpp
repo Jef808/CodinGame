@@ -17,10 +17,19 @@ bool DpView::init(const dp::Game& game, Resolution resolution, int history_lengt
     m_params = game.get_params();
 
     std::string_view fn;
-    switch(resolution) {
-        case Resolution::Small: tile_size = 32; fn = small; break;
-        case Resolution::Medium: tile_size = 64; fn = medium; break;
-        case Resolution::Big: tile_size = 128; fn = big; break;
+    switch (resolution) {
+    case Resolution::Small:
+        tile_size = 32;
+        fn = small;
+        break;
+    case Resolution::Medium:
+        tile_size = 64;
+        fn = medium;
+        break;
+    case Resolution::Big:
+        tile_size = 128;
+        fn = big;
+        break;
     }
 
     if (!m_tileset.loadFromFile(fn.data()))
@@ -58,7 +67,7 @@ bool DpView::init(const dp::Game& game, Resolution resolution, int history_lengt
     // add the walls (WallL = 1, WallR = 2)
     for (int i = 0; i < height; ++i) {
         m_background[i * width] = 1;
-        m_background[(i+1) * width - 1] = 2;
+        m_background[(i + 1) * width - 1] = 2;
     }
 
     // add the elevators (Elevator = 5)
@@ -112,14 +121,14 @@ void DpView::update(const dp::Data* data, const std::string& msg)
     auto it_blocked_clones = it_elevators + data->n_player_elevators;
     auto it_end = it_blocked_clones + data->n_blocked_clones;
 
-    auto ndx = [w=width, h=m_params->height](int pos, int floor){ return (pos + 1) + w * (h - 1 - floor); };
-    auto tr = [](const auto& e){ switch(e.type){
+    auto ndx = [w = width, h = m_params->height](int pos, int floor) { return (pos + 1) + w * (h - 1 - floor); };
+    auto tr = [](const auto& e) { switch(e.type){
             case Type::Elevator: return 5;
             case Type::Clone: return *e.dir == Dir::Left ? 6 : 7;
             default: assert(false);
-        }};
+        } };
 
-    std::for_each(it_clones, it_end, [&](const auto& e){
+    std::for_each(it_clones, it_end, [&](const auto& e) {
         m_buffer[ndx(e.pos, e.floor)] = tr(e);
     });
 
@@ -135,4 +144,4 @@ void DpView::draw(sf::RenderTarget& target, sf::RenderStates states) const
     target.draw(m_text);
 }
 
-}  // namespace dp
+} // namespace dp

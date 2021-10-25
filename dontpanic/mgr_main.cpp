@@ -1,27 +1,24 @@
-#include "view/dpview.h"
 #include "dp.h"
 #include "mgr.h"
+#include "view/dpview.h"
 
-#include <chrono>
 #include <cassert>
-#include <iostream>
+#include <chrono>
 #include <fstream>
-#include <thread>
+#include <iostream>
 #include <random>
+#include <thread>
 
-
-#include <fmt/format.h>
-#include <SFML/Window/Event.hpp>
 #include <SFML/Graphics/RenderWindow.hpp>
+#include <SFML/Window/Event.hpp>
+#include <fmt/format.h>
 
 using namespace dp;
 
 void main_loop(DpMgr& mgr)
 {
-    while (true)
-    {
-        if (mgr.pre_input())
-        {
+    while (true) {
+        if (mgr.pre_input()) {
             // output state here
 
             Action a = Action::Wait;
@@ -31,25 +28,24 @@ void main_loop(DpMgr& mgr)
             mgr.post_input();
         }
 
-        switch(mgr.status) {
-            case DpMgr::status::Won:
-                std::cout << "Success!"
-                          << std::endl;
-                return;
-            case DpMgr::status::Lost:
-                std::cout << "Game over"
-                          << std::endl;
-                return;
-            case DpMgr::status::Error:
-                std::cout << "Error"
-                          << std::endl;
-                return;
-            default:
-                continue;
+        switch (mgr.status) {
+        case DpMgr::status::Won:
+            std::cout << "Success!"
+                      << std::endl;
+            return;
+        case DpMgr::status::Lost:
+            std::cout << "Game over"
+                      << std::endl;
+            return;
+        case DpMgr::status::Error:
+            std::cout << "Error"
+                      << std::endl;
+            return;
+        default:
+            continue;
         }
     }
 }
-
 
 int main(int argc, char* argv[])
 {
@@ -76,8 +72,7 @@ int main(int argc, char* argv[])
     //assert(mgr.status == DpMgr::status::Initialized);
 
     DpView viewer;
-    if (!viewer.init(game, Resolution::Small))
-    {
+    if (!viewer.init(game, Resolution::Small)) {
         fmt::print("Failed to initialise the viewer");
     }
 
@@ -86,11 +81,9 @@ int main(int argc, char* argv[])
     Action action;
     int action_i;
 
-    while (window.isOpen())
-    {
+    while (window.isOpen()) {
         sf::Event event;
-        while (window.pollEvent(event))
-        {
+        while (window.pollEvent(event)) {
             if (event.type == sf::Event::Closed)
                 window.close();
         }
@@ -100,8 +93,7 @@ int main(int argc, char* argv[])
         window.display();
 
         // Do some work to get actions here
-        if (mgr.pre_input())
-        {
+        if (mgr.pre_input()) {
             action_i = -1;
             while (action_i < 0 || action_i > 4) {
                 std::cout << "1: Wait, 2: Block, 3: Elevator, 0: quit"
@@ -116,9 +108,9 @@ int main(int argc, char* argv[])
             // action_i = std::rand() % 3;
             // action = Action(action_i);
 
-            if (!mgr.input(Action(action_i), std::cerr))
-            {
-                std::cout << "Invalid action, one more change...\n" << std::endl;
+            if (!mgr.input(Action(action_i), std::cerr)) {
+                std::cout << "Invalid action, one more change...\n"
+                          << std::endl;
 
                 action_i = -1;
                 while (action_i < 0 || action_i > 4) {
@@ -130,7 +122,7 @@ int main(int argc, char* argv[])
 
                 if (action_i == 4 || !mgr.input(Action(action_i), std::cerr)) {
                     std::cout << "Exiting program"
-                        << std::endl;
+                              << std::endl;
                     window.close();
                     return EXIT_SUCCESS;
                 }
@@ -143,17 +135,15 @@ int main(int argc, char* argv[])
 
             if (mgr.status == DpMgr::status::Won) {
                 std::cout << "Game Won!!!"
-                    << std::endl;
+                          << std::endl;
 
                 std::this_thread::sleep_for(std::chrono::milliseconds(1000));
                 window.close();
                 return EXIT_SUCCESS;
             }
-        }
-        else
-        {
+        } else {
             std::cerr << "Game over"
-                << std::endl;
+                      << std::endl;
 
             window.close();
 

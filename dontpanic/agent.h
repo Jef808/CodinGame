@@ -14,7 +14,7 @@ namespace agent {
     /// The best choice to date
     dp::Action best_choice();
 
-}  // namespace agent
-}  // namespace dp
+} // namespace agent
+} // namespace dp
 
 #endif // AGENT_H_

@@ -6,11 +6,11 @@
 #include <thread>
 
 //#if RUNNING_OFFLINE
- #include "view/dpview.h"
- #include <fmt/format.h>
- #include <SFML/Window/Event.hpp>
- #include <SFML/Graphics/RenderWindow.hpp>
- #include <SFML/Window/Keyboard.hpp>
+#include "view/dpview.h"
+#include <SFML/Graphics/RenderWindow.hpp>
+#include <SFML/Window/Event.hpp>
+#include <SFML/Window/Keyboard.hpp>
+#include <fmt/format.h>
 //#endif
 
 #include "dp.h"
@@ -41,17 +41,24 @@ int main(int argc, char* argv[])
 
     auto tile_size = [](Resolution res) {
         int ret;
-        switch(res) {
-            case Resolution::Small:  ret = 32;  break;
-            case Resolution::Medium: ret = 64;  break;
-            case Resolution::Big:    ret = 128; break;
-            default: throw "Unknown resolution";
+        switch (res) {
+        case Resolution::Small:
+            ret = 32;
+            break;
+        case Resolution::Medium:
+            ret = 64;
+            break;
+        case Resolution::Big:
+            ret = 128;
+            break;
+        default:
+            throw "Unknown resolution";
         }
         return ret;
     };
 
     Resolution res = Resolution::Big;
-    int window_width  = (game.get_params()->width + 2) * tile_size(res);
+    int window_width = (game.get_params()->width + 2) * tile_size(res);
     if (window_width > screen_width) {
         res = Resolution::Medium;
         window_width = (game.get_params()->width + 2) * tile_size(res);
@@ -64,19 +71,16 @@ int main(int argc, char* argv[])
     int window_height = game.get_params()->height * tile_size(res) + 32;
 
     dp::DpView viewer;
-    if (!viewer.init(game, res))
-    {
+    if (!viewer.init(game, res)) {
         fmt::print("Failed to initialise the viewer");
         return EXIT_FAILURE;
     }
 
     sf::RenderWindow window(sf::VideoMode(window_width, window_height), "Don't Panic!");
 
-    while (window.isOpen())
-    {
+    while (window.isOpen()) {
         sf::Event event;
-        while (window.pollEvent(event))
-        {
+        while (window.pollEvent(event)) {
             if (event.type == sf::Event::Closed)
                 window.close();
             if (event.type == sf::Event::KeyPressed)

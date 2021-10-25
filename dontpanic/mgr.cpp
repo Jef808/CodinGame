@@ -14,7 +14,7 @@ namespace dp {
 
 Entity& reverse(Entity& clone)
 {
-    assert (clone.type == Type::Clone);
+    assert(clone.type == Type::Clone);
     clone.dir = std::make_optional(*clone.dir == Dir::Right ? Dir::Left : Dir::Right);
     return clone;
 }
@@ -62,17 +62,18 @@ bool DpMgr::pre_input()
     if (n_turns > prm->max_round)
         status = status::Lost;
 
-    switch(status) {
-        case status::Initialized:
-            status = status::Ongoing;
-        case status::Ongoing:
-            break;
-        case status::Won:
-        case status::Lost:
-        case status::Error:
-        case status::Uninitialized:
-            return false;
-        default: assert(false);
+    switch (status) {
+    case status::Initialized:
+        status = status::Ongoing;
+    case status::Ongoing:
+        break;
+    case status::Won:
+    case status::Lost:
+    case status::Error:
+    case status::Uninitialized:
+        return false;
+    default:
+        assert(false);
     }
 
     if (clones_spawned < prm->max_clones) {
@@ -182,7 +183,7 @@ bool DpMgr::at_elevator(const Entity& c)
 
 bool DpMgr::at_blocked(const Entity& c)
 {
-    return std::find_if(blocked_clones.begin(), blocked_clones.end(), [&c](const auto& b){
+    return std::find_if(blocked_clones.begin(), blocked_clones.end(), [&c](const auto& b) {
         return b.floor == c.floor && b.pos == c.pos;
     }) != blocked_clones.end();
 }

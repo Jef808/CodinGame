@@ -4,35 +4,35 @@
 #include <cassert>
 #include <chrono>
 #include <fstream>
-#include <iostream>
 #include <iomanip>
+#include <iostream>
 #include <sstream>
 #include <string>
 #include <string_view>
 #include <thread>
 
 #if RUNNING_OFFLINE
- #include "view/dpview.h"
- #include "mgr.h"
- #include <fmt/format.h>
- #include <SFML/Window/Event.hpp>
- #include <SFML/Graphics/RenderWindow.hpp>
+#include "mgr.h"
+#include "view/dpview.h"
+#include <SFML/Graphics/RenderWindow.hpp>
+#include <SFML/Window/Event.hpp>
+#include <fmt/format.h>
 #endif
 
-#include "dp.h"
 #include "agent.h"
+#include "dp.h"
 
 std::string to_string(const dp::Action a)
 {
     switch (a) {
-        case dp::Action::Wait:
-            return "WAIT";
-        case dp::Action::Block:
-            return "BLOCK";
-        case dp::Action::Elevator:
-            return "ELEVATOR";
-        default:
-            return throw "Action::None", "WARNING: Chose Action::None";
+    case dp::Action::Wait:
+        return "WAIT";
+    case dp::Action::Block:
+        return "BLOCK";
+    case dp::Action::Elevator:
+        return "ELEVATOR";
+    default:
+        return throw "Action::None", "WARNING: Chose Action::None";
     }
 }
 
@@ -48,7 +48,6 @@ void ignore_turn(std::istream& _in)
     std::getline(_in, buf);
     _in.ignore();
 }
-
 
 using namespace dp;
 
@@ -82,8 +81,8 @@ int main(int argc, char* argv[])
 
     auto time = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start).count();
     std::cerr << std::setprecision(4)
-            << "Time taken: "
-            << time / 1000 << "ms" << std::endl;
+              << "Time taken: "
+              << time / 1000 << "ms" << std::endl;
 
     dp::DpMgr mgr;
     mgr.load(game);
@@ -92,17 +91,24 @@ int main(int argc, char* argv[])
 
     auto tile_size = [](Resolution res) {
         int ret;
-        switch(res) {
-            case Resolution::Small:  ret = 32;  break;
-            case Resolution::Medium: ret = 64;  break;
-            case Resolution::Big:    ret = 128; break;
-            default: throw "Unknown resolution";
+        switch (res) {
+        case Resolution::Small:
+            ret = 32;
+            break;
+        case Resolution::Medium:
+            ret = 64;
+            break;
+        case Resolution::Big:
+            ret = 128;
+            break;
+        default:
+            throw "Unknown resolution";
         }
         return ret;
     };
 
     Resolution res = Resolution::Big;
-    int window_width  = (game.get_params()->width + 2) * tile_size(res);
+    int window_width = (game.get_params()->width + 2) * tile_size(res);
     if (window_width > screen_width) {
         res = Resolution::Medium;
         window_width = (game.get_params()->width + 2) * tile_size(res);
@@ -115,8 +121,7 @@ int main(int argc, char* argv[])
     int window_height = game.get_params()->height * tile_size(res) + 32;
 
     dp::DpView viewer;
-    if (!viewer.init(game, res))
-    {
+    if (!viewer.init(game, res)) {
         fmt::print("Failed to initialise the viewer");
         return EXIT_FAILURE;
     }
@@ -125,15 +130,12 @@ int main(int argc, char* argv[])
 
     int delay = 500;
 
-    while (window.isOpen())
-    {
+    while (window.isOpen()) {
         sf::Event event;
-        while (window.pollEvent(event))
-        {
+        while (window.pollEvent(event)) {
             if (event.type == sf::Event::Closed)
                 window.close();
-            if (event.type == sf::Event::KeyPressed)
-            {
+            if (event.type == sf::Event::KeyPressed) {
                 if (event.key.code == sf::Keyboard::Escape)
                     window.close();
                 if (event.key.code == sf::Keyboard::F)
@@ -149,19 +151,22 @@ int main(int argc, char* argv[])
 
         std::this_thread::sleep_for(std::chrono::milliseconds(delay));
 
-        if (!mgr.pre_input())
-        {
+        if (!mgr.pre_input()) {
             switch (mgr.status) {
-                case DpMgr::status::Won:
-                    std::cerr << "Success!"
-                        << std::endl; break;
-                case DpMgr::status::Lost:
-                    std::cerr << "Failure!"
-                        << std::endl; break;
-                case DpMgr::status::Error:
-                    std::cerr << "Error"
-                        << std::endl; break;
-                default: assert(false);
+            case DpMgr::status::Won:
+                std::cerr << "Success!"
+                          << std::endl;
+                break;
+            case DpMgr::status::Lost:
+                std::cerr << "Failure!"
+                          << std::endl;
+                break;
+            case DpMgr::status::Error:
+                std::cerr << "Error"
+                          << std::endl;
+                break;
+            default:
+                assert(false);
             }
 
             window.close();
@@ -170,17 +175,14 @@ int main(int argc, char* argv[])
 
         Action action = dp::agent::best_choice();
 
-        if (action == Action::None)
-        {
+        if (action == Action::None) {
             std::cout << "Done with agent's action queue"
-                << std::endl;
+                      << std::endl;
             window.close();
             break;
         }
 
-
-        if (!mgr.input(action, std::cerr))
-        {
+        if (!mgr.input(action, std::cerr)) {
             std::cout << "Received invalid action"
                       << std::endl;
             window.close();
@@ -209,7 +211,7 @@ int main(int argc, char* argv[])
 
     agent::init(game);
 
-     auto start = std::chrono::steady_clock::now();
+    auto start = std::chrono::steady_clock::now();
 
     agent::search();
 

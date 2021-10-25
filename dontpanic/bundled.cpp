@@ -1,19 +1,19 @@
 #define RUNNING_OFFLINE 1
 #define EXTRACTING_ONLINE_DATA 0
 
-#undef _GLIBCXX_DEBUG                // disable run-time bound checking, etc
+#undef _GLIBCXX_DEBUG // disable run-time bound checking, etc
 #pragma GCC optimize("Ofast,inline") // Ofast = O3,fast-math,allow-store-data-races,no-protect-parens
 
-#pragma GCC target("bmi,bmi2,lzcnt,popcnt")                      // bit manipulation
-#pragma GCC target("movbe")                                      // byte swap
-#pragma GCC target("aes,pclmul,rdrnd")                           // encryption
+#pragma GCC target("bmi,bmi2,lzcnt,popcnt") // bit manipulation
+#pragma GCC target("movbe") // byte swap
+#pragma GCC target("aes,pclmul,rdrnd") // encryption
 #pragma GCC target("avx,avx2,f16c,fma,sse3,ssse3,sse4.1,sse4.2") // SIMD
 
-#include <optional>
-#include <vector>
 #include <algorithm>
 #include <cassert>
 #include <iostream>
+#include <optional>
+#include <vector>
 
 namespace dp {
 
@@ -24,8 +24,10 @@ constexpr int max_n_clones = 50;
 constexpr int max_n_elevators = 100;
 constexpr int max_time_ms = 100;
 
-enum class Type { Elevator, Clone };
-enum class Dir { Right, Left };
+enum class Type { Elevator,
+    Clone };
+enum class Dir { Right,
+    Left };
 struct Entity {
     Type type;
     int pos;
@@ -190,8 +192,8 @@ namespace agent {
     /// The best choice to date
     dp::Action best_choice();
 
-}  // namespace agent
-}  // namespace dp
+} // namespace agent
+} // namespace dp
 
 #endif // AGENT_H_
 
@@ -212,7 +214,7 @@ using AAction = int;
 /// Same for elevators, since we split them into floors
 using AElevator = int;
 
-    constexpr int max_actions = dp::max_width;
+constexpr int max_actions = dp::max_width;
 
 using Cost = int;
 constexpr int cost_max = dp::max_width * dp::max_height + 1;
@@ -249,7 +251,6 @@ std::deque<dp::Action> best_actions;
 bool depth_first_search(const dp::State& s, int max_depth);
 
 } // namespace
-
 
 namespace dp::agent {
 
@@ -289,7 +290,7 @@ void search()
     best_actions.push_back(dp::Action::Wait);
 }
 
-}  // namespace dp::agent
+} // namespace dp::agent
 
 namespace {
 using namespace dp;
@@ -297,7 +298,7 @@ using namespace dp;
 /// Split the elevators into floors and order them wrt their position
 void init_elevators()
 {
-    for (int i=0; i<=params.exit_floor; ++i) {
+    for (int i = 0; i <= params.exit_floor; ++i) {
         auto& elevs = elevators.emplace_back();
         for (const auto& el : params.elevators) {
             if (el.floor == i)
@@ -316,17 +317,17 @@ void init_actions()
         seen.push_back(std::vector<bool>(params.width, false));
     }
 
-    n_empty_floors_above.push_back(std::count_if(elevators.begin(), elevators.begin() + params.exit_floor, [](const auto& els){
-                return els.empty();
-            }));
-    for (int i=0; i<params.exit_floor - 1; ++i) {
+    n_empty_floors_above.push_back(std::count_if(elevators.begin(), elevators.begin() + params.exit_floor, [](const auto& els) {
+        return els.empty();
+    }));
+    for (int i = 0; i < params.exit_floor - 1; ++i) {
         n_empty_floors_above.push_back(n_empty_floors_above[i] - elevators[i].empty());
     }
     n_empty_floors_above.push_back(0);
     n_empty_floors_above.push_back(0);
 
     const int max_gap = params.n_add_elevators;
-    auto elevator_gap = [max_gap](int floor){
+    auto elevator_gap = [max_gap](int floor) {
         return max_gap - n_empty_floors_above[floor];
     };
 
@@ -340,10 +341,10 @@ void init_actions()
 
     /// add targets at the columns before any elevators blocking the exit
     {
-        auto first_rightof_exit = std::find_if(elevators[params.exit_floor].begin(), elevators[params.exit_floor].end(), [p=params.exit_pos](const auto& el){
+        auto first_rightof_exit = std::find_if(elevators[params.exit_floor].begin(), elevators[params.exit_floor].end(), [p = params.exit_pos](const auto& el) {
             return el > p;
         });
-        auto first_leftof_exit = std::find_if(elevators[params.exit_floor].rbegin(), elevators[params.exit_floor].rend(), [p=params.exit_pos](const auto& el){
+        auto first_leftof_exit = std::find_if(elevators[params.exit_floor].rbegin(), elevators[params.exit_floor].rend(), [p = params.exit_pos](const auto& el) {
             return el < p;
         });
 
@@ -375,10 +376,11 @@ void init_actions()
     }
     /// Save the result in the global vector
     for (int i = 0; i <= params.exit_floor; ++i)
-        std::transform(seen.begin(), seen.end(), std::back_inserter(candidates), [](const auto& target){
+        std::transform(seen.begin(), seen.end(), std::back_inserter(candidates), [](const auto& target) {
             ActionList ret;
-            for (int p=0; p<params.width; ++p)
-                if (target[p]) ret.push_back(p);
+            for (int p = 0; p < params.width; ++p)
+                if (target[p])
+                    ret.push_back(p);
             return ret;
         });
 }
@@ -393,10 +395,11 @@ inline bool at_exit(const State& s)
     return at_exit_floor(s) && s.pos == params.exit_pos;
 }
 
-inline bool on_elevator(int pos, int floor) {
-    return std::find_if(params.elevators.begin(), params.elevators.end(), [p=pos, f=floor](const auto& el){
-            return el.floor == f && el.pos == p;
-        }) != params.elevators.end();
+inline bool on_elevator(int pos, int floor)
+{
+    return std::find_if(params.elevators.begin(), params.elevators.end(), [p = pos, f = floor](const auto& el) {
+        return el.floor == f && el.pos == p;
+    }) != params.elevators.end();
 }
 
 /// true if the action sequence ends with the player creating an elevator
@@ -448,8 +451,8 @@ inline bool is_lost(const State& s)
     return future_cost_lb(s) > s.turn
         || n_empty_floors_above[s.floor] > s.player_elevators
         || s.clones < 0;
-        //|| s.floor > params.exit_floor
-        //|| s.pos < 0 || s.pos > params.width - 1;
+    //|| s.floor > params.exit_floor
+    //|| s.pos < 0 || s.pos > params.width - 1;
 }
 
 State& apply(const State& s, const AAction a)
@@ -481,17 +484,16 @@ void populate_actions(const State& s, const AAction a, std::deque<dp::Action>& q
         q.push_front(dp::Action::Wait);
 
     if (is_player_elevator(s, a)) {
-        for (int i=0; i<2; ++i)
+        for (int i = 0; i < 2; ++i)
             q.push_front(dp::Action::Wait);
         q.push_front(dp::Action::Elevator);
     }
 
-    for (int i=0; i < distance(s.floor, s.pos, s.floor, a); ++i)
+    for (int i = 0; i < distance(s.floor, s.pos, s.floor, a); ++i)
         q.push_front(dp::Action::Wait);
 
-    if (is_block(s, a))
-    {
-        for (int i=0; i<2; ++i)
+    if (is_block(s, a)) {
+        for (int i = 0; i < 2; ++i)
             q.push_front(dp::Action::Wait);
         q.push_front(dp::Action::Block);
     }
@@ -511,15 +513,14 @@ const std::vector<AAction>& get_valid_actions(const State& s)
         if (s.dir == Dir::Right) {
             first_el_right = s.pos;
             ignore_right = true;
-        }
-        else if (s.dir == Dir::Left) {
+        } else if (s.dir == Dir::Left) {
             first_el_left = s.pos;
             ignore_left = true;
         }
     }
 
     if (!ignore_right) {
-        auto el_right = std::find_if(elevators[s.floor].begin(), elevators[s.floor].end(), [p=s.pos](AElevator el){
+        auto el_right = std::find_if(elevators[s.floor].begin(), elevators[s.floor].end(), [p = s.pos](AElevator el) {
             return el > p;
         });
 
@@ -529,7 +530,7 @@ const std::vector<AAction>& get_valid_actions(const State& s)
     }
 
     if (!ignore_left) {
-        auto el_left = std::find_if(elevators[s.floor].rbegin(), elevators[s.floor].rend(), [p=s.pos](AElevator el){
+        auto el_left = std::find_if(elevators[s.floor].rbegin(), elevators[s.floor].rend(), [p = s.pos](AElevator el) {
             return el < p;
         });
 
@@ -552,7 +553,7 @@ const std::vector<AAction>& get_valid_actions(const State& s)
         }
     }
 
-    std::sort(actions_buffer.begin(), actions_buffer.end(), [](AAction a, AAction b){
+    std::sort(actions_buffer.begin(), actions_buffer.end(), [](AAction a, AAction b) {
         return cost_buffer[a] < cost_buffer[b];
     });
 
@@ -591,15 +592,11 @@ bool depth_first_search(const State& s, int max_depth)
 
 } // namespace
 
-
-
-
-
 #include <cassert>
 #include <chrono>
 #include <fstream>
-#include <iostream>
 #include <iomanip>
+#include <iostream>
 #include <sstream>
 #include <string>
 
@@ -610,14 +607,14 @@ bool depth_first_search(const State& s, int max_depth)
 std::ostream& operator<<(std::ostream& _out, const dp::Action a)
 {
     switch (a) {
-        case dp::Action::Wait:
-            return _out << "WAIT";
-        case dp::Action::Block:
-            return _out << "BLOCK";
-        case dp::Action::Elevator:
-            return _out << "ELEVATOR";
-        default:
-            return throw "Action::None", _out << "WARNING: Chose Action::None";
+    case dp::Action::Wait:
+        return _out << "WAIT";
+    case dp::Action::Block:
+        return _out << "BLOCK";
+    case dp::Action::Elevator:
+        return _out << "ELEVATOR";
+    default:
+        return throw "Action::None", _out << "WARNING: Chose Action::None";
     }
 }
 
@@ -671,8 +668,8 @@ int main(int argc, char* argv[])
 
     auto time = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start).count();
     std::cerr << std::setprecision(4)
-            << "Time taken: "
-            << time / 1000 << "ms" << std::endl;
+              << "Time taken: "
+              << time / 1000 << "ms" << std::endl;
 
     Action action = agent::best_choice();
     while (action != Action::None) {

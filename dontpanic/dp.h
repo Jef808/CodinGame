@@ -24,8 +24,10 @@ enum class cell_t {
     Nb = 6
 };
 
-enum class Type { Elevator, Clone };
-enum class Dir { Right, Left };
+enum class Type { Elevator,
+    Clone };
+enum class Dir { Right,
+    Left };
 struct Entity {
     Type type;
     int pos;

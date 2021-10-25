@@ -19,7 +19,7 @@ using AAction = int;
 /// Same for elevators, since we split them into floors
 using AElevator = int;
 
-    constexpr int max_actions = dp::max_width;
+constexpr int max_actions = dp::max_width;
 
 using Cost = int;
 constexpr int cost_max = dp::max_width * dp::max_height + 1;
@@ -56,7 +56,6 @@ std::deque<dp::Action> best_actions;
 bool depth_first_search(const dp::State& s, int max_depth);
 
 } // namespace
-
 
 namespace dp::agent {
 
@@ -96,7 +95,7 @@ void search()
     best_actions.push_back(dp::Action::Wait);
 }
 
-}  // namespace dp::agent
+} // namespace dp::agent
 
 namespace {
 using namespace dp;
@@ -104,7 +103,7 @@ using namespace dp;
 /// Split the elevators into floors and order them wrt their position
 void init_elevators()
 {
-    for (int i=0; i<=gparams->exit_floor; ++i) {
+    for (int i = 0; i <= gparams->exit_floor; ++i) {
         auto& elevs = elevators.emplace_back();
         for (const auto& el : gparams->elevators) {
             if (el.floor == i)
@@ -123,17 +122,17 @@ void init_actions()
         seen.push_back(std::vector<bool>(gparams->width, false));
     }
 
-    n_empty_floors_above.push_back(std::count_if(elevators.begin(), elevators.begin() + gparams->exit_floor, [](const auto& els){
-                return els.empty();
-            }));
-    for (int i=0; i<gparams->exit_floor - 1; ++i) {
+    n_empty_floors_above.push_back(std::count_if(elevators.begin(), elevators.begin() + gparams->exit_floor, [](const auto& els) {
+        return els.empty();
+    }));
+    for (int i = 0; i < gparams->exit_floor - 1; ++i) {
         n_empty_floors_above.push_back(n_empty_floors_above[i] - elevators[i].empty());
     }
     n_empty_floors_above.push_back(0);
     n_empty_floors_above.push_back(0);
 
     const int max_gap = gparams->n_add_elevators;
-    auto elevator_gap = [max_gap](int floor){
+    auto elevator_gap = [max_gap](int floor) {
         return max_gap - n_empty_floors_above[floor];
     };
 
@@ -147,10 +146,10 @@ void init_actions()
 
     /// add targets at the columns before any elevators blocking the exit
     {
-        auto first_rightof_exit = std::find_if(elevators[gparams->exit_floor].begin(), elevators[gparams->exit_floor].end(), [p=gparams->exit_pos](const auto& el){
+        auto first_rightof_exit = std::find_if(elevators[gparams->exit_floor].begin(), elevators[gparams->exit_floor].end(), [p = gparams->exit_pos](const auto& el) {
             return el > p;
         });
-        auto first_leftof_exit = std::find_if(elevators[gparams->exit_floor].rbegin(), elevators[gparams->exit_floor].rend(), [p=gparams->exit_pos](const auto& el){
+        auto first_leftof_exit = std::find_if(elevators[gparams->exit_floor].rbegin(), elevators[gparams->exit_floor].rend(), [p = gparams->exit_pos](const auto& el) {
             return el < p;
         });
 
@@ -182,10 +181,11 @@ void init_actions()
     }
     /// Save the result in the global vector
     for (int i = 0; i <= gparams->exit_floor; ++i)
-        std::transform(seen.begin(), seen.end(), std::back_inserter(candidates), [](const auto& target){
+        std::transform(seen.begin(), seen.end(), std::back_inserter(candidates), [](const auto& target) {
             ActionList ret;
-            for (int p=0; p<gparams->width; ++p)
-                if (target[p]) ret.push_back(p);
+            for (int p = 0; p < gparams->width; ++p)
+                if (target[p])
+                    ret.push_back(p);
             return ret;
         });
 }
@@ -200,10 +200,11 @@ inline bool at_exit(const State& s)
     return at_exit_floor(s) && s.pos == gparams->exit_pos;
 }
 
-inline bool on_elevator(int pos, int floor) {
-    return std::find_if(gparams->elevators.begin(), gparams->elevators.end(), [p=pos, f=floor](const auto& el){
-            return el.floor == f && el.pos == p;
-        }) != gparams->elevators.end();
+inline bool on_elevator(int pos, int floor)
+{
+    return std::find_if(gparams->elevators.begin(), gparams->elevators.end(), [p = pos, f = floor](const auto& el) {
+        return el.floor == f && el.pos == p;
+    }) != gparams->elevators.end();
 }
 
 /// true if the action sequence ends with the player creating an elevator
@@ -255,8 +256,8 @@ inline bool is_lost(const State& s)
     return future_cost_lb(s) > s.turn
         || n_empty_floors_above[s.floor] > s.player_elevators
         || s.clones < 0;
-        //|| s.floor > gparams->exit_floor
-        //|| s.pos < 0 || s.pos > gparams->width - 1;
+    //|| s.floor > gparams->exit_floor
+    //|| s.pos < 0 || s.pos > gparams->width - 1;
 }
 
 State& apply(const State& s, const AAction a)
@@ -288,17 +289,16 @@ void populate_actions(const State& s, const AAction a, std::deque<dp::Action>& q
         q.push_front(dp::Action::Wait);
 
     if (is_player_elevator(s, a)) {
-        for (int i=0; i<2; ++i)
+        for (int i = 0; i < 2; ++i)
             q.push_front(dp::Action::Wait);
         q.push_front(dp::Action::Elevator);
     }
 
-    for (int i=0; i < distance(s.floor, s.pos, s.floor, a); ++i)
+    for (int i = 0; i < distance(s.floor, s.pos, s.floor, a); ++i)
         q.push_front(dp::Action::Wait);
 
-    if (is_block(s, a))
-    {
-        for (int i=0; i<2; ++i)
+    if (is_block(s, a)) {
+        for (int i = 0; i < 2; ++i)
             q.push_front(dp::Action::Wait);
         q.push_front(dp::Action::Block);
     }
@@ -318,15 +318,14 @@ const std::vector<AAction>& get_valid_actions(const State& s)
         if (s.dir == Dir::Right) {
             first_el_right = s.pos;
             ignore_right = true;
-        }
-        else if (s.dir == Dir::Left) {
+        } else if (s.dir == Dir::Left) {
             first_el_left = s.pos;
             ignore_left = true;
         }
     }
 
     if (!ignore_right) {
-        auto el_right = std::find_if(elevators[s.floor].begin(), elevators[s.floor].end(), [p=s.pos](AElevator el){
+        auto el_right = std::find_if(elevators[s.floor].begin(), elevators[s.floor].end(), [p = s.pos](AElevator el) {
             return el > p;
         });
 
@@ -336,7 +335,7 @@ const std::vector<AAction>& get_valid_actions(const State& s)
     }
 
     if (!ignore_left) {
-        auto el_left = std::find_if(elevators[s.floor].rbegin(), elevators[s.floor].rend(), [p=s.pos](AElevator el){
+        auto el_left = std::find_if(elevators[s.floor].rbegin(), elevators[s.floor].rend(), [p = s.pos](AElevator el) {
             return el < p;
         });
 
@@ -359,7 +358,7 @@ const std::vector<AAction>& get_valid_actions(const State& s)
         }
     }
 
-    std::sort(actions_buffer.begin(), actions_buffer.end(), [](AAction a, AAction b){
+    std::sort(actions_buffer.begin(), actions_buffer.end(), [](AAction a, AAction b) {
         return cost_buffer[a] < cost_buffer[b];
     });
 
