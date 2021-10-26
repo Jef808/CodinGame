@@ -221,22 +221,18 @@ State& Game::apply(State& s, Action a) const
 
 int n_conseq_holes()
 {
-    int n = 0;
+    int res = 0;
     for (int i = 0; i < 4; ++i) {
-        auto h = std::find(params.road[i].begin(), params.road[i].end(), Cell::Hole);
-
-        if (h == params.road[i].end())
-            return n;
-
-        auto j = std::find(h, params.road[i].end(), Cell::Bridge);
-        if (j == params.road[i].end())
-            return n;
-
-        int m = std::distance(h, j);
-        n = m > n ? m : n;
+        auto it = params.road[i].begin();
+        while (it != params.road[i].end())
+        {
+            it = std::find(it, params.road[i].end(), Cell::Hole);
+            auto n_conseq = std::distance(it, std::find(it, params.road[i].end(), Cell::Bridge));
+            res = n_conseq > res : n_conseq : res;
+            it += n_conseq;
+        }
     }
-
-    return n;
+    return res;
 }
 
 const std::array<Action, 5>& Game::valid_actions(const State& s) const
