@@ -18,6 +18,7 @@ namespace {
     tb::State root_state;
 
     std::array<std::vector<int>, 4> nex_holes;
+    int last_hole;
 
     /// Used to populate the nex_holes data
     void nex_holes_dists();
@@ -90,18 +91,28 @@ namespace {
  */
 void nex_holes_dists()
 {
+    last_hole = 0;
     for (int i = 0; i < 4; ++i) {
-        auto& holed_i = nex_holes[i];
+        auto holed_i = std::back_inserter(nex_holes[i]);
         auto pos_it = params.road[i].begin();
         auto hol_it = pos_it;
-        do {
+        while (true)
+        {
             hol_it = std::find(pos_it + 1, params.road[i].end(), Cell::Hole);
-            while (pos_it != hol_it) {
-                holed_i.push_back(std::distance(pos_it, hol_it));
-                ++pos_it;
+            auto dist = std::distance(pos_it, hol_it);
+            if (hol_it == params.road[i].end())
+            {
+                std::fill_n(holed_i, dist, Max_length);
+                break;
             }
-
-        } while (hol_it != params.road[i].end());
+            else
+            {
+                pos_it += dist;
+                last_hole += dist;
+                for (; dist >= 0; --dist)
+                    holed_i = dist;
+            }
+        }
     }
 }
 

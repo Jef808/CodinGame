@@ -131,8 +131,9 @@ inline Cost future_cost_lb(const State& s)
     int p = s.pos, v = s.speed, t = 0;
 
     while (p < road_length()) {
+        v += 1;
+        p += v;
         t += 1;
-        p += p + v + 1;
     }
 
     return t;
@@ -140,7 +141,7 @@ inline Cost future_cost_lb(const State& s)
 
 bool inline n_bikes(const State& s)
 {
-    return std::count_if(s.bikes.begin(), s.bikes.end(), [](auto b){ return b; });
+    return std::count(s.bikes.begin(), s.bikes.end(), 1);
 }
 
 bool inline at_eor(const State& s)
@@ -148,9 +149,14 @@ bool inline at_eor(const State& s)
     return s.pos >= prm->road[0].size();
 }
 
+int inline n_turns_left(const State& s)
+{
+    return Max_depth - s.turn;
+}
+
 bool inline is_lost(const State& s)
 {
-    return future_cost_lb(s) > Max_depth - s.turn
+    return future_cost_lb(s) > n_turns_left(s)
         || n_bikes(s) < prm->min_bikes;
 }
 
