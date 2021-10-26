@@ -5,59 +5,24 @@
 
 namespace tb {
 
+struct ExtAction;
+
 class Agent {
 public:
+    using Cost = int;
+
     Agent() = default;
-    void setup(std::istream&, std::ostream&, int timelim_ms = 0, bool online = true);
-    void solve();
+    void solve(const Game& game, int time_limit_ms = 0);
 
 private:
     Game game;
-    bool use_time;
-    bool playing_online;
-    int root_depth;
-    int depth_completed;
-    bool game_over;
+    int time_limit_ms{ 0 };
 
-    std::istream* in;
-    std::ostream* out;
+    void init(const Game& game, int time_limit_ms);
+    const std::vector<ExtAction>& generate_actions(const State& s) const;
 
-    bool play_turn();
-    void loop_solved();
+    Cost depth_first_search(const State&, int depth, bool& timeout) const;
 };
-
-struct VAction {
-    VAction()
-        : action { Action::None }
-        , cost { Cost::Unknown }
-    {
-    }
-    explicit VAction(Action a)
-        : action { a }
-        , cost { a == Action::None ? Cost::Infinite : Cost::Unknown }
-    {
-    }
-    Action action { Action::None };
-    Cost cost { Cost::Unknown };
-    inline bool operator<(const VAction& va) const
-    {
-        return cost < va.cost;
-    }
-    inline bool operator==(const Action a) const
-    {
-        return action == a;
-    }
-    inline bool operator!=(const Action a) const
-    {
-        return action != a;
-    }
-    inline bool operator!=(const VAction& va) const
-    {
-        return action != va.action;
-    }
-};
-
-extern std::ostream& operator<<(std::ostream& _out, const VAction& va);
 
 } // namespace tb
 

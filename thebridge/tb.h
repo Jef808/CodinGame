@@ -2,26 +2,25 @@
 #define TB_H_
 
 #include <array>
-#include <iosfwd>
+#include <cstdint>
 #include <vector>
-
-#include "types.h"
-
 
 namespace tb {
 
-/**
- * The mutable part of the game.
- */
-struct State {
-    Key key;
-    size_t pos;
-    size_t speed;
-    std::array<bool, 4> bikes{ 0, 0, 0, 0 };
-    int turn{ 0 };
-    State* prev;
+constexpr size_t Max_length = 500;
+constexpr size_t Max_depth = 50;
+constexpr size_t Max_actions = 5;
+
+using Key = uint32_t;
+
+enum class Cell { Bridge, Hole };
+using Road = std::array<std::vector<Cell>, 4>;
+
+using Bikes = std::array<bool, 4>;
+
+enum class Action {
+    None=0, Speed=1, Jump=2, Up=3, Down=4, Slow=5
 };
-typedef std::array<std::vector<Cell>, 4> Road;
 
 /**
  * The immutable part of the game.
@@ -32,54 +31,35 @@ struct Params {
     int min_bikes;
 };
 
-extern Params params;
-
-class Agent;
+/**
+ * The mutable part of the game.
+ */
+struct State {
+    Key key;
+    size_t pos;
+    size_t speed;
+    Bikes bikes{ 0, 0, 0, 0 };
+    int turn;
+    State* prev;
+};
 
 /**
  * Class implementing the game simulation.
  */
 class Game {
 public:
-    enum class Status { Loss=0, Unknown=1, Win };
-    using ActionList = std::vector<Action>;
-
-    static void init(std::istream&);
     Game() = default;
-    void set(State&);
-    void apply(State&, Action a);
-    void undo();
-    std::array<Action, 5> candidates() const;
-    bool is_won() const;
-    bool is_lost() const;
-    uint32_t key() const;
-    int n_bikes() const;
-    int turn() const { return pstate->turn; }
-    int pos() const { return pstate->pos; }
-    size_t get_speed() const { return pstate->speed; }
-    size_t road_length() const { return pparams->road[0].size(); }
-    Params const* parameters() const { return pparams; }
-    void show(std::ostream&) const;
 
-private:
-    State* pstate;
-    Params * const pparams = &tb::params;
+    void init(std::istream&);
+    State& apply(State&, Action a) const;
+    const std::array<Action, Max_actions>& valid_actions(const State&) const;
+    bool at_eor(const State&) const;
+    bool is_lost(const State&) const;
+    uint32_t key(const State&) const;
+    Params const* parameters() const;
+    State const* state() const;
+    void show(std::ostream&, const State&) const;
 };
-
-inline bool Game::is_won() const {
-    return (pstate->pos >= pparams->road[0].size() && !(is_lost()));
-}
-
-inline bool Game::is_lost() const
-{
-    return pstate->turn > 50 || n_bikes() < params.min_bikes;
-}
-
-inline Key Game::key() const {
-    return pstate->key;
-}
-
-extern std::ostream& operator<<(std::ostream& out, const Action a);
 
 } // namespace tb
 

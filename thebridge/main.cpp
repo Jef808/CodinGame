@@ -1,93 +1,54 @@
-#include <iostream>
-#include <fstream>
-#include <optional>
-#include <sstream>
+#define RUNNING_OFFLINE 1
+#define EXTRACTING_ONLINE_DATA 0
 
 #include "tb.h"
 #include "agent.h"
-#include "types.h"
 
-#include "viewer.h"
+#include <string>
+#include <iostream>
+#include <fstream>
+
+void ignore_turn(const tb::Game& game, std::istream& _in)
+{
+    std::string buf;
+    for (int i = 0; i < game.parameters()->start_bikes + 1; ++i)
+        std::getline(_in, buf);
+}
+
 
 using namespace tb;
 
-
-State input_turn(std::istream& _in) {
-    State state;
-    //std::stringstream ss{};
-    int x, y, a;  // x-coord, y-coord, active-or-not
-    _in >> state.speed; _in.ignore();
-
-    for (int i=0; i<params.start_bikes; ++i)
-    {
-        _in >> x >> y >> a; _in.ignore();
-
-        //ss << x << ' ' << y << ' ' << a << std::endl;
-        state.bikes[i] = (a == 1);
-    }
-    state.pos = x;
-    return state;
-}
-
-void input_turn_ignore(std::istream& _in) {
-    std::string buf;
-    for (int i=0; i<params.start_bikes+1; ++i) {
-        std::getline(_in, buf);
-    }
-}
-
-/**
- * Helper class representing either std::cin or some std::ifstream.
- */
-class Istream {
-public:
-    Istream(const std::string& fn = std::string()) :
-        ifs{ fn.empty() ? std::nullopt : std::make_optional(std::ifstream{fn}) }
-    {
-        std::ios_base::sync_with_stdio(false);
-        if (ifs) {
-            std::cin.rdbuf(ifs->rdbuf());
-        }
-    }
-    operator bool() {
-        return std::cin.good() && (!ifs || ifs->is_open());
-    }
-    operator std::istream&() {
-        return std::cin;
-    }
-private:
-    std::optional<std::ifstream> ifs;
-};
-
-
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
-    Istream is{ argc > 1 ? argv[1] : std::string() };
+#if RUNNING_OFFLINE
 
-    if (argc > 1 && !is) {
-        std::cerr << "Failed to open "
-            << argv[1] << std::endl;
+    const int turn_time_ms = 0;
+
+    if (argc < 2) {
+        std::cerr << "Main: Input file needed!" << std::endl;
+        return EXIT_FAILURE;
     }
 
-    static constexpr int max_time_ms = 150;
+    std::ifstream ifs { argv[1] };
+    if (!ifs) {
+        std::cerr << "Main: Failed to open input file!" << std::endl;
+        return EXIT_FAILURE;
+    }
+
     Game game;
-    Agent agent(game);
-    Game::init(is);
-    State init_state = input_turn(is);
+    game.init(ifs);
 
-    // Could close the file here really
-    game.set(init_state);
+#else
 
-    agent.set_time_lim(max_time_ms);
-    agent.init(20);     // Save 32mb for the transposition table
+    const int turn_time_ms = 150;
 
-    auto action = agent.get_next();
+    Game game;
+    game.init(std::cin);
 
-    while (action != Action::None) {
-        std::cout << action << std::endl;
-        input_turn_ignore(is);
-        action = agent.get_next();
-    }
+#endif
 
-    return 0;
+    Agent agent;
+    agent.solve(game, turn_time_ms);
+
+    return EXIT_SUCCESS;
 }
