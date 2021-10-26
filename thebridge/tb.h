@@ -3,6 +3,7 @@
 
 #include <array>
 #include <cstdint>
+#include <iosfwd>
 #include <vector>
 
 namespace tb {
