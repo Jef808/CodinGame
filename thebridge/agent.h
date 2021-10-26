@@ -16,7 +16,7 @@ public:
 
 private:
     Game game;
-    int time_limit_ms{ 0 };
+    int time_limit_ms { 0 };
 
     void init(const Game& game, int time_limit_ms);
     const std::vector<ExtAction>& generate_actions(const State& s) const;

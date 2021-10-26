@@ -2,7 +2,7 @@
 #include <iostream>
 
 struct Timer {
-    using Clock = std::chrono::steady_clock ;
+    using Clock = std::chrono::steady_clock;
     using Point = Clock::time_point;
     using Duration = double;
 
@@ -17,20 +17,21 @@ struct Timer {
     bool warning_sent { false };
 };
 
-
-inline Timer::Duration Timer::elapsed() {
+inline Timer::Duration Timer::elapsed()
+{
     using std::chrono::duration_cast;
     using std::chrono::milliseconds;
     return duration_cast<milliseconds>(
-        Clock::now() - m_start).count();
+        Clock::now() - m_start)
+        .count();
 }
 
-inline bool Timer::out() {
-    if (limit == std::numeric_limits<int>::max() && !warning_sent)
-    {
+inline bool Timer::out()
+{
+    if (limit == std::numeric_limits<int>::max() && !warning_sent) {
         warning_sent = true;
         std::cerr << "Timer: Received timeout query but time limit is not set."
-            << std::endl;
+                  << std::endl;
     }
 
     return elapsed() > limit;

@@ -14,13 +14,19 @@ constexpr size_t Max_actions = 5;
 
 using Key = uint32_t;
 
-enum class Cell { Bridge, Hole };
+enum class Cell { Bridge,
+    Hole };
 using Road = std::array<std::vector<Cell>, 4>;
 
 using Bikes = std::array<bool, 4>;
 
 enum class Action {
-    None=0, Speed=1, Jump=2, Up=3, Down=4, Slow=5
+    None = 0,
+    Speed = 1,
+    Jump = 2,
+    Up = 3,
+    Down = 4,
+    Slow = 5
 };
 
 /**
@@ -39,7 +45,7 @@ struct State {
     Key key;
     size_t pos;
     size_t speed;
-    Bikes bikes{ 0, 0, 0, 0 };
+    Bikes bikes { 0, 0, 0, 0 };
     int turn;
     State* prev;
 };
@@ -63,7 +69,5 @@ public:
 };
 
 } // namespace tb
-
-
 
 #endif // TB_H_

@@ -8,45 +8,45 @@
 
 namespace {
 
-    using Cost = tb::Agent::Cost;
+using Cost = tb::Agent::Cost;
 
-    namespace cost {
-        enum : Cost { zero = 0,
-               known_win = 1,
-               unknown = tb::Max_depth / 2,
-               known_loss = tb::Max_depth + 1,
-               max = tb::Max_depth + 2,
-             };
-    }
+namespace cost {
+    enum : Cost { zero = 0,
+        known_win = 1,
+        unknown = tb::Max_depth / 2,
+        known_loss = tb::Max_depth + 1,
+        max = tb::Max_depth + 2,
+    };
+}
 
-}  // namespace
+} // namespace
 
 namespace tb {
 
-    struct ExtAction {
-        ExtAction()
-            : action { Action::None }
-            , cost { cost::unknown }
-        {
-        }
-        explicit ExtAction(Action a)
-            : action { a }
-            , cost { a == Action::None ? cost::max : cost::unknown }
-        {
-        }
-        operator Action() const { return action; }
-        Action action;
-        Cost cost;
-        /// Sorting orders actions in increasing order of cost
-        inline bool operator<(const ExtAction& other) const
-        {
-            return cost < other.cost;
-        }
-        inline bool operator==(const ExtAction& other) const
-        {
-            return action == other.action;
-        }
-    };
+struct ExtAction {
+    ExtAction()
+        : action { Action::None }
+        , cost { cost::unknown }
+    {
+    }
+    explicit ExtAction(Action a)
+        : action { a }
+        , cost { a == Action::None ? cost::max : cost::unknown }
+    {
+    }
+    operator Action() const { return action; }
+    Action action;
+    Cost cost;
+    /// Sorting orders actions in increasing order of cost
+    inline bool operator<(const ExtAction& other) const
+    {
+        return cost < other.cost;
+    }
+    inline bool operator==(const ExtAction& other) const
+    {
+        return action == other.action;
+    }
+};
 
 namespace {
 
@@ -62,7 +62,6 @@ namespace {
 
 } // namespace
 
-
 /**
  * Main method to be called from main.
  */
@@ -77,22 +76,21 @@ void Agent::solve(const Game& game, int time_limit_ms)
 
     ActionList* sa = &sactions[0];
 
-    for (int depth = 0; depth < Max_depth; ++depth)
-    {
+    for (int depth = 0; depth < Max_depth; ++depth) {
         best_cost = depth_first_search(states[0], depth, timeout);
 
-            /// The stable version of the sort algorithm guarantees to preserve
-            /// the ordering of two elements of equal value.
-            std::stable_sort(sa->begin(), sa->end());
+        /// The stable version of the sort algorithm guarantees to preserve
+        /// the ordering of two elements of equal value.
+        std::stable_sort(sa->begin(), sa->end());
 
-            if (best_cost <= cost::known_win)
-                return;
+        if (best_cost <= cost::known_win)
+            return;
 
-            if (timeout) {
-                continue;
-            }
+        if (timeout) {
+            continue;
+        }
 
-            break;
+        break;
 
         /// Check if we have time for the next depth really
         if (time.out()) {
@@ -109,59 +107,57 @@ void Agent::init(const Game& game, int time_limit_ms)
 
     this->time_limit_ms = time_limit_ms;
 
-    std::for_each(&sactions[0], &sactions[Max_depth], [](auto& al){
-        al.fill(ExtAction{});
+    std::for_each(&sactions[0], &sactions[Max_depth], [](auto& al) {
+        al.fill(ExtAction {});
     });
 }
 
 namespace {
 
+    inline size_t road_length()
+    {
+        return prm->road[0].size();
+    }
 
-inline size_t road_length()
-{
-    return prm->road[0].size();
-}
-
-/**
+    /**
  * The greatest lower bound for the number of turns in
  * which it is possible to reach the end of the road.
  */
-inline Cost future_cost_lb(const State& s)
-{
-    int p = s.pos, v = s.speed, t = 0;
+    inline Cost future_cost_lb(const State& s)
+    {
+        int p = s.pos, v = s.speed, t = 0;
 
-    while (p < road_length()) {
-        v += 1;
-        p += v;
-        t += 1;
+        while (p < road_length()) {
+            v += 1;
+            p += v;
+            t += 1;
+        }
+
+        return t;
     }
 
-    return t;
-}
+    bool inline n_bikes(const State& s)
+    {
+        return std::count(s.bikes.begin(), s.bikes.end(), 1);
+    }
 
-bool inline n_bikes(const State& s)
-{
-    return std::count(s.bikes.begin(), s.bikes.end(), 1);
-}
+    bool inline at_eor(const State& s)
+    {
+        return s.pos >= prm->road[0].size();
+    }
 
-bool inline at_eor(const State& s)
-{
-    return s.pos >= prm->road[0].size();
-}
+    int inline n_turns_left(const State& s)
+    {
+        return Max_depth - s.turn;
+    }
 
-int inline n_turns_left(const State& s)
-{
-    return Max_depth - s.turn;
-}
-
-bool inline is_lost(const State& s)
-{
-    return future_cost_lb(s) > n_turns_left(s)
-        || n_bikes(s) < prm->min_bikes;
-}
+    bool inline is_lost(const State& s)
+    {
+        return future_cost_lb(s) > n_turns_left(s)
+            || n_bikes(s) < prm->min_bikes;
+    }
 
 } // namespace
-
 
 const std::vector<ExtAction>& Agent::generate_actions(const State& s) const
 {
@@ -175,7 +171,6 @@ const std::vector<ExtAction>& Agent::generate_actions(const State& s) const
 
     return ret;
 }
-
 
 Cost Agent::depth_first_search(const State& s, int depth, bool& timeout) const
 {
@@ -196,8 +191,7 @@ Cost Agent::depth_first_search(const State& s, int depth, bool& timeout) const
     Cost best_cost = cost::max;
     Action best_action = Action::None;
 
-    if (depth == 0)
-    {
+    if (depth == 0) {
         for (auto& a : actions) {
             if (a == Action::None || a.cost == cost::known_loss)
                 continue;
@@ -220,7 +214,7 @@ Cost Agent::depth_first_search(const State& s, int depth, bool& timeout) const
     // Sort the actions here
 
     for (auto& a : actions) {
-        if (a == Action::None || a.cost == cost::known_loss)  // a.cost >= cost::known_loss
+        if (a == Action::None || a.cost == cost::known_loss) // a.cost >= cost::known_loss
             continue;
 
         State& st = game.apply(*ps++, a);
