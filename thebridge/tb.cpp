@@ -228,7 +228,7 @@ int n_conseq_holes()
         {
             it = std::find(it, params.road[i].end(), Cell::Hole);
             auto n_conseq = std::distance(it, std::find(it, params.road[i].end(), Cell::Bridge));
-            res = n_conseq > res : n_conseq : res;
+            res = n_conseq > res ? n_conseq : res;
             it += n_conseq;
         }
     }
