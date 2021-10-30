@@ -10,15 +10,18 @@
 #include <SFML/Window/Keyboard.hpp>
 
 
+constexpr auto tileset32 = "resources/tileset_tb32.png";
+constexpr auto tileset64 = "resources/tileset_tb64.png";
+
 enum class Tile {
-    Bridge, Hole
+    Bridge, Hole, Bike, BikeHole
 };
 
 using namespace tb;
 
 int main(int argc, char* argv[])
 {
-    const int window_width = 800, window_height = 600;
+    const int window_width = 1920, window_height = 1080 / 2;
 
     if (argc < 2) {
         std::cerr << "Main: Input file needed!" << std::endl;

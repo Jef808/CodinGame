@@ -13,11 +13,11 @@ namespace tb {
 /// Globals
 namespace {
 
-    tb::Params params;
-    tb::State root_state;
+    tb::Params params{ };
+    tb::State root_state{ };
 
-    std::array<std::vector<int>, 4> nex_holes;
-    int last_hole;
+    std::array<std::vector<int>, 4> nex_holes{ };
+    int last_hole = 0;
 
     /// Used to populate the nex_holes data
     void nex_holes_dists();
@@ -92,23 +92,29 @@ namespace {
     {
         last_hole = 0;
         for (int i = 0; i < 4; ++i) {
-            auto holed_i = std::back_inserter(nex_holes[i]);
+            auto holed_it = std::back_inserter(nex_holes[i]);
             auto pos_it = params.road[i].begin();
-            auto hol_it = pos_it;
-            while (true) {
-                hol_it = std::find(pos_it + 1, params.road[i].end(), Cell::Hole);
-                auto dist = std::distance(pos_it, hol_it);
-                if (hol_it == params.road[i].end()) {
-                    std::fill_n(holed_i, dist, Max_length);
-                    break;
-                } else {
-                    pos_it += dist;
-                    last_hole += dist;
-                    for (; dist >= 0; --dist)
-                        holed_i = dist;
+            while (pos_it != params.road[i].end()) {
+                auto holes_beg = std::find(pos_it, params.road[i].end(), Cell::Hole);
+                auto holes_end = std::find(holes_beg, params.road[i].end(), Cell::Bridge);
+                auto dist = std::distance(pos_it, holes_beg);
+                if (holes_beg == params.road[i].end()) {
+                    std::fill_n(holed_it, dist, Max_length);
                 }
+                else {
+                    std::generate_n(holed_it, dist, [n=dist]() mutable {return n--;});
+                    std::fill_n(holed_it, std::distance(holes_beg, holes_end), 0);
+                }
+                pos_it = holes_end;
             }
         }
+
+        for (int i=0; i < 4; ++i) {
+            for (int j = 0; j < nex_holes[i].size(); ++j)
+                std::cout << nex_holes[i][j] << ' ';
+            std::cout << '\n';
+        }
+        std::cout << std::endl;
     }
 
     void input_turn(std::istream& _in, State& st)
@@ -184,10 +190,11 @@ namespace {
 
 } // namespace
 
-State& Game::apply(State& s, Action a) const
+void Game::apply(const State& state, Action a, State& s) const
 {
+    s = state;
     s.key ^= Zobrist::key_pos[s.pos];
-    s.key ^= Zobrist::get_key_bikes(s);
+    s.key ^= Zobrist::get_key_bikes(state);
     switch (a) {
     // case Action::Wait:
     //     wait(s);
@@ -213,10 +220,8 @@ State& Game::apply(State& s, Action a) const
 
     ++s.turn;
 
-    s.key ^= Zobrist::key_pos[s.pos];
+    s.key = Zobrist::key_pos[s.pos];
     s.key ^= Zobrist::get_key_bikes(s);
-
-    return s;
 }
 
 int n_conseq_holes()
@@ -235,37 +240,48 @@ int n_conseq_holes()
     return res;
 }
 
-const std::array<Action, 5>& Game::valid_actions(const State& s) const
+int n_conseq_holes2()
+{
+    int res = 0;
+    for (int i=0; i<4; ++i)
+        for (auto it = nex_holes[i].begin(); it != nex_holes[i].end() && *it < Max_length; ++it)
+            res = *it > res ? *it : res;
+    return res;
+}
+
+const std::vector<Action>& Game::valid_actions(const State& s) const
 {
     static const int longest_jump = n_conseq_holes();
     static std::array<Action, 5> actions = {
         Action::Speed, Action::Jump, Action::Up, Action::Down, Action::Slow
     };
+    static std::vector<Action> ret;
+    ret.clear();
+    auto out = std::back_inserter(ret);
 
     // Speed is our first choice, but we cap the speed
     // to reduce number of candidates
-    if (s.speed >= longest_jump + 1)
-        actions[0] = Action::None;
+    if (s.speed < longest_jump + 1)
+        out = Action::Speed;
 
     if (s.speed == 0) {
-        actions[1] = actions[2] = actions[3] = actions[4] = Action::None;
-        return actions;
+        return ret;
     }
 
-    // Always include Jump
+    out = Action::Jump;
 
     // Cannot go up if 0 is occupied
-    if (s.bikes[0])
-        actions[2] = Action::None;
+    if (!s.bikes[0])
+        out = Action::Up;
     // Cannot go down if 3 is occupied
     if (s.bikes[3])
-        actions[3] = Action::None;
+        out = Action::Down;
 
     // Don't stop the bikes
     if (s.speed <= 1)
-        actions[4] = Action::None;
+        out = Action::Slow;
 
-    return actions;
+    return ret;
 }
 
 void Game::show(std::ostream& _out, const State& s) const

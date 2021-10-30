@@ -58,14 +58,13 @@ public:
     Game() = default;
 
     void init(std::istream&);
-    State& apply(State&, Action a) const;
-    const std::array<Action, Max_actions>& valid_actions(const State&) const;
-    bool at_eor(const State&) const;
-    bool is_lost(const State&) const;
-    uint32_t key(const State&) const;
+    void apply(const State&, Action a, State&) const;
+    const std::vector<Action>& valid_actions(const State&) const;
     Params const* parameters() const;
     State const* state() const;
-    void show(std::ostream&, const State&) const;
+    void show(std::ostream& _out, const State& s) const;
+
+    const Road& get_road() const { return parameters()->road; }
 };
 
 } // namespace tb
