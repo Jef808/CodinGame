@@ -31,16 +31,19 @@ enum class TileSize {
     Big
 };
 
+/// Up: (0, 0) = bottom left corner, Down: (0, 0) = upper left corner
+enum class YDirection {
+    Up,
+    Down
+};
 
 template<typename TileEnum>
 class Viewer : public sf::Drawable {
 public:
-    /// Up: (0, 0) = bottom left corner, Down: (0, 0) = upper left corner
-    enum class YDirection { Up, Down };
 
     Viewer() = default;
 
-    bool init(const std::string& texture_file, int width, int height, TileSize tile_size) {
+    bool init(const std::string& texture_file, int width, int height, TileSize tile_size, YDirection y_dir = YDirection::Up) {
         /// Load the texture file
         if (!m_tileset.loadFromFile(texture_file)) {
             std::cerr << "Viewerer: failed to open texture file"
@@ -62,11 +65,14 @@ public:
             case TileSize::Big:    this->tile_size = 128; break;
         }
 
+        /// The the origin
+        this->y_direction = y_dir;
+
         /// Set the dimensions of the grid (in number of tiles)
         this->width = width;
         this->height = height;
 
-        /// Set the dimensions of the tile (inside the texture)
+        /// Set the dimensions of the tile (in the texture file)
         n_tiles_x = m_tileset.getSize().x / this->tile_size;
         n_tiles_y = m_tileset.getSize().y / this->tile_size;
 
@@ -74,25 +80,31 @@ public:
         m_vertices.setPrimitiveType(sf::Quads);
         m_vertices.resize(width * height * 4);
 
+        /// Allocate memory and initialize the buffers
+        m_background.resize(width * height);
+        m_foreground.resize(width * height);
+
+        m_background.push_back(-1);
+        std::fill_n(&m_background[0], width * height, -1);
+        m_foreground.push_back(-1);
+        std::fill_n(&m_foreground[0], width * height, -1);
+
         // set the drawing position of the quads
-        for (int i = 0; i < height; ++i)
-            for (int j = 0; j < width; ++j) {
+        for (int y = 0; y < height; ++y)
+            for (int x = 0; x < width; ++x) {
 
-                sf::Vertex* quad = &m_vertices[(i * width + j) * 4];
+                sf::Vertex* quad = &m_vertices[y_direction == YDirection::Up
+                                               ? index_reversed(x, y) * 4
+                                               : index(x, y) * 4];
 
-                // the position at which the quad is to be drawn,
                 // indexing clockwise from the upper left vertex
-                quad[0].position = sf::Vector2f(j * this->tile_size, i * this->tile_size);
-                quad[1].position = sf::Vector2f((j + 1) * this->tile_size, i * this->tile_size);
-                quad[2].position = sf::Vector2f((j + 1) * this->tile_size, (i + 1) * this->tile_size);
-                quad[3].position = sf::Vector2f(j * this->tile_size, (i + 1) * this->tile_size);
+                quad[0].position = sf::Vector2f(x * this->tile_size, y * this->tile_size);
+                quad[1].position = sf::Vector2f((x + 1) * this->tile_size, y * this->tile_size);
+                quad[2].position = sf::Vector2f((x + 1) * this->tile_size, (y + 1) * this->tile_size);
+                quad[3].position = sf::Vector2f(x * this->tile_size, (y + 1) * this->tile_size);
             }
 
-        /// Allocate memory for the buffers
-        m_background.clear();
-        m_background.resize(width * height);
-
-        /// Setup parameters for the messages
+        /// Setup parameters for displaying messages
         m_text.setFont(m_font);
         m_text.setCharacterSize(24);
         m_text.setFillColor(sf::Color::Red);
@@ -120,6 +132,18 @@ public:
         }
     }
 
+    void set_tilepos_bg(TileEnum tile, int x, int y) {
+        m_background[index(x, y)] = get(tile);
+    }
+
+    void set_tilepos_fg(TileEnum tile, int x, int y) {
+        m_foreground[index(x, y)] = get(tile);
+    }
+
+    void reset_fg() {
+        std::fill_n(m_foreground.begin(), width * height, -1);
+    }
+
     void show_status(std::ostream& out) {
         out << "Number of tiles: " << m_tilemap.size()
             << "\nBackgroud size: " << m_background.size()
@@ -129,41 +153,26 @@ public:
             << std::endl;
     }
 
-    void set_tilepos_bg(TileEnum tile, int x, int y) {
-        m_background[index(x, y)] = get(tile);
-    }
+    void freeze() {
+        for (int y = 0; y < height; ++y)
+            for (int x = 0; x < width; ++x) {
+                auto ndx = index(x, y);
+                auto tile_num = m_foreground[ndx] != -1
+                    ? m_foreground[ndx]
+                    : m_background[ndx];
 
-    void set_tilepos_fg(TileEnum tile, int x, int y) {
-        auto ndx = index_out(x, y);
-        auto tile_num = get(tile);
-        sf::Vertex* quad = &m_vertices[ndx * 4];
+                if (tile_num == -1) {
+                    std::cerr << "Viewer: Warning! tile ("
+                              << x << ", " << y
+                              << ") unset!" << std::endl;
+                    continue;
+                }
 
-        // the row/column coordinates of the target texture tile
-        int tx = tile_num % n_tiles_x;
-        int ty = tile_num / n_tiles_x;
-
-        // make the quad point to the corresponding squares in the texture itself
-        quad[0].texCoords = sf::Vector2f(tx * tile_size, ty * tile_size);
-        quad[1].texCoords = sf::Vector2f((tx + 1) * tile_size, ty * tile_size);
-        quad[2].texCoords = sf::Vector2f((tx + 1) * tile_size, (ty + 1) * tile_size);
-        quad[3].texCoords = sf::Vector2f(tx * tile_size, (ty + 1) * tile_size);
-    }
-
-    void reset() {
-        for (int x = 0; x < width; ++x)
-            for (int y = 0; y < height; ++y) {
-                auto ndx = index_out(x, y);
-                auto ndx_out = index_out(x, y);
-                auto tile_num = m_background[ndx];
-                sf::Vertex* quad = &m_vertices[ndx_out * 4];
+                sf::Vertex* quad = &m_vertices[ndx * 4];
 
                 // the row/column coordinates of the target texture tile
                 int tx = tile_num % n_tiles_x;
-                int ty = tile_num / n_tiles_y;
-
-                std::cout << "Setting pos " << x << ' ' << y
-                    << " to " << tx * tile_size << ' ' << ty * tile_size
-                    << std::endl;
+                int ty = tile_num / n_tiles_x;
 
                 // make the quad point to the corresponding squares in the texture itself
                 quad[0].texCoords = sf::Vector2f(tx * tile_size, ty * tile_size);
@@ -190,6 +199,7 @@ private:
     sf::Font m_font;
     std::vector<std::pair<TileEnum, int>> m_tilemap;
     std::vector<int> m_background;
+    std::vector<int> m_foreground;
     int tile_size;
     int width;
     int height;
@@ -199,7 +209,6 @@ private:
 
     int get(TileEnum tile) {
         int tile_num = std::lower_bound(m_tilemap.begin(), m_tilemap.end(), tile, CmpTileMap)->second;
-        std::cout << "tile " << tile_num << std::endl;
         return tile_num;
     }
 
@@ -207,7 +216,7 @@ private:
         return x + width * y;
     }
 
-    size_t index_out(int x, int y) {
+    size_t index_reversed(int x, int y) {
         return x + width * (height - 1 - y);
     }
 
