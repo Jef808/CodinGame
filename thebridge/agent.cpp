@@ -3,6 +3,8 @@
 #include "timeutil.h"
 
 #include <algorithm>
+#include <cassert>
+#include <deque>
 #include <fstream>
 #include <iostream>
 
@@ -11,11 +13,11 @@ namespace {
 using Cost = tb::Agent::Cost;
 
 namespace cost {
-    enum : Cost { zero = 0,
+    enum : Cost { none = 0,
         known_win = 1,
         unknown = tb::Max_depth / 2,
         known_loss = tb::Max_depth + 1,
-        max = tb::Max_depth + 2,
+        max = tb::Max_depth + 2
     };
 }
 
@@ -24,41 +26,48 @@ namespace cost {
 namespace tb {
 
 struct ExtAction {
-    ExtAction()
-        : action { Action::None }
-        , cost { cost::unknown }
-    {
-    }
+    ExtAction() = default;
     explicit ExtAction(Action a)
         : action { a }
         , cost { a == Action::None ? cost::max : cost::unknown }
     {
     }
+    /// Implicitely convertible to an Action
     operator Action() const { return action; }
-    Action action;
-    Cost cost;
     /// Sorting orders actions in increasing order of cost
-    inline bool operator<(const ExtAction& other) const
-    {
+    inline bool operator<(const ExtAction& other) const {
         return cost < other.cost;
     }
-    inline bool operator==(const ExtAction& other) const
-    {
+    inline bool operator==(const ExtAction& other) const {
         return action == other.action;
     }
+    Action action{ Action::None };
+    Cost cost{ cost::unknown };
 };
 
-namespace {
 
-    /// Globals
-    using ActionList = std::array<ExtAction, Max_actions>;
+using ActionList = std::array<ExtAction, Max_actions>;
+
+struct Stack {
+    ActionList* pactions{ nullptr };
+    State* pstate{ nullptr };
+    Action action{ Action::None };
+    Cost cost{ cost::unknown };
+    int action_count{ 0 };
+    int depth{ 0 };
+};
+
+/// Globals
+namespace {
 
     const Params* prm;
     Timer time;
 
     ActionList sactions[Max_depth + 1];
     std::array<State, Max_depth + 1> states;
-    State* ps { &states[0] };
+    int last_hole = Max_length;
+
+    std::deque<Action> best_actions;
 
 } // namespace
 
@@ -72,37 +81,46 @@ void Agent::solve(const Game& game, int time_limit_ms)
 
     init(game, time_limit_ms);
 
-    Cost best_cost = cost::max;
+    std::array<Stack, Max_depth> stack;
+    stack.fill(Stack{});
+    Stack* ss = &stack[0];
 
-    ActionList* sa = &sactions[0];
+    for (int depth=0; depth < Max_depth; ++depth)
+    {
+        // Initialize the next stack depth for the next iteration
+        (ss + depth)->depth = depth;
+        (ss + depth)->pstate = &states[depth];
+        (ss + depth)->pactions = &sactions[depth];
 
-    for (int depth = 0; depth < Max_depth; ++depth) {
-        best_cost = depth_first_search(states[0], depth, timeout);
+        Cost best_cost = depth_first_search(depth, timeout, ss);
 
-        /// The stable version of the sort algorithm guarantees to preserve
-        /// the ordering of two elements of equal value.
-        std::stable_sort(sa->begin(), sa->end());
+        // std::stable_sort(pa->begin(), pa->end());
 
-        if (best_cost <= cost::known_win)
-            return;
+        if (best_cost <= cost::known_win) {
+            // TODO: Stop searching and recreate the winning sequence
+            break;
+        }
 
         if (timeout) {
+            // TODO: output the best action so far, apply it on state
+            // and do the next search without incrementing the depth
+            // since the root just moved up in depth
+            ++ss;
             continue;
         }
-
-        break;
-
-        /// Check if we have time for the next depth really
-        if (time.out()) {
-            return;
-            time.reset();
-        }
     }
+}
+
+Action Agent::next_action() const
+{
+    return sactions[actions_out_count++][0];
 }
 
 void Agent::init(const Game& game, int time_limit_ms)
 {
     prm = game.parameters();
+    last_hole = game.find_last_hole();
+
     states[0] = *game.state();
 
     this->time_limit_ms = time_limit_ms;
@@ -114,15 +132,18 @@ void Agent::init(const Game& game, int time_limit_ms)
 
 namespace {
 
-    inline size_t road_length()
+    size_t inline road_length()
     {
         return prm->road[0].size();
     }
 
-    /**
- * The greatest lower bound for the number of turns in
- * which it is possible to reach the end of the road.
- */
+    int inline n_bikes(const State& s)
+    {
+        return std::count(s.bikes.begin(), s.bikes.end(), 1);
+    }
+
+    /// The greatest lower bound for the number of turns in
+    /// which it is possible to reach the end of the road
     inline Cost future_cost_lb(const State& s)
     {
         int p = s.pos, v = s.speed, t = 0;
@@ -136,14 +157,21 @@ namespace {
         return t;
     }
 
-    bool inline n_bikes(const State& s)
+    /// Compute a penalty if bikes were lost
+    Cost inline action_cost(const State& before, const State& after)
     {
-        return std::count(s.bikes.begin(), s.bikes.end(), 1);
+        int bikes_lost = n_bikes(after) - n_bikes(before);
+        return 1 + 5 * bikes_lost;
     }
 
     bool inline at_eor(const State& s)
     {
         return s.pos >= prm->road[0].size();
+    }
+
+    bool inline is_past_holes(const State& s)
+    {
+        return s.pos >= last_hole;
     }
 
     int inline n_turns_left(const State& s)
@@ -164,7 +192,8 @@ const std::vector<ExtAction>& Agent::generate_actions(const State& s) const
     static std::vector<ExtAction> ret;
     ret.clear();
 
-    const auto& actions = game.valid_actions(s);
+    auto actions = game.valid_actions(s);
+
     std::transform(actions.begin(), actions.end(), std::back_inserter(ret), [](auto a) {
         return ExtAction(a);
     });
@@ -172,68 +201,80 @@ const std::vector<ExtAction>& Agent::generate_actions(const State& s) const
     return ret;
 }
 
-Cost Agent::depth_first_search(const State& s, int depth, bool& timeout) const
+Cost Agent::depth_first_search(int depth, bool& timeout, Stack* ss) const
 {
-    if (at_eor(s))
+    if (is_lost(*ss->pstate))
+        return cost::known_loss;
+
+    if (is_past_holes(*ss->pstate)) {
+        ss->pactions->fill(ExtAction(Action::None)); // Use as sentinel
         return cost::known_win;
-
-    std::array<ExtAction, Max_actions> actions {
-        ExtAction(Action::None),
-        ExtAction(Action::None),
-        ExtAction(Action::None),
-        ExtAction(Action::None),
-        ExtAction(Action::None)
-    };
-
-    const auto& candidates = generate_actions(s);
-    std::copy(candidates.begin(), candidates.end(), actions.begin());
-
-    Cost best_cost = cost::max;
-    Action best_action = Action::None;
+    }
 
     if (depth == 0) {
-        for (auto& a : actions) {
-            if (a == Action::None || a.cost == cost::known_loss)
-                continue;
-
-            State& st = game.apply(*ps++, a);
-            /// Check for lost before win so that we can skip some checks
-            /// when checking for a win
-            if (is_lost(st)) {
-                return cost::known_loss;
-            }
-            if (at_eor(st)) {
-                return cost::known_win;
-            }
-        }
-
-        return best_cost == cost::max ? cost::known_loss : best_cost;
+        return future_cost_lb(*ss->pstate);
     }
 
-    // [[ depth > 0 ]]
-    // Sort the actions here
+    ActionList actions {
+        ExtAction{ Action::None },
+        ExtAction{ Action::None },
+        ExtAction{ Action::None },
+        ExtAction{ Action::None },
+        ExtAction{ Action::None }
+    };
+    ActionList::iterator local_pa;
+    ActionList::iterator local_pa_end;
 
-    for (auto& a : actions) {
-        if (a == Action::None || a.cost == cost::known_loss) // a.cost >= cost::known_loss
-            continue;
+    bool on_main_line = ss->action_count == 0;
 
-        State& st = game.apply(*ps++, a);
-        a.cost = depth_first_search(s, depth - 1, timeout);
-        --ps;
-
-        if (a.cost == cost::known_win) {
-            // Immediately return down to solve() and
-            // reconstruct the winning action sequence
-
-            best_cost = a.cost;
-            best_action = a;
-            break;
-        }
-        if (a.cost < best_cost) {
-            best_cost = a.cost;
-            best_action = a;
-        }
+    if (!on_main_line) {
+        const auto& candidates = generate_actions(*ss->pstate);
+        std::copy(candidates.begin(), candidates.end(), actions.begin());
+        ss->pactions = &actions;
     }
+
+    local_pa = ss->pactions->begin();
+    local_pa_end = std::find(local_pa, ss->pactions->end(), ExtAction{ Action::None });
+
+    Action best_action = *local_pa;      // Implicit downcast from ExtAction to Action
+    Cost best_cost = cost::max;
+    
+    for (auto it = local_pa; it != local_pa_end; ++it)
+    {
+        ++ss->action_count;
+
+        /// The actions are sorted so this would mark the end
+        if (it->cost >= cost::known_loss)
+            return cost::known_loss;
+
+        /// Apply the action
+        (ss + 1)->action = *it;
+        game.apply(*ss->pstate, *it, *(ss + 1)->pstate);
+
+        /// Recursively evaluate the future cost
+        Cost cost = action_cost(*ss->pstate, *(ss + 1)->pstate)
+            + depth_first_search(depth - 1, timeout, ss + 1);
+
+        /// Return immediately if winning line found
+        if (it->cost == cost::known_win) {
+            ss->pactions->front().action = best_action;
+            return it->cost;
+        }
+
+        /// Update best cost
+        if (it->cost < best_cost) {
+            best_cost = it->cost;
+            best_action = *it;
+        }
+
+        /// Mark the paths that are known losses on main lain
+        if (on_main_line && it->cost == cost::max)
+            it->cost = cost::known_loss;
+    }
+
+    /// Keep the actions of main line
+    if (on_main_line)
+        std::stable_sort(ss->pactions->begin(), ss->pactions->end());
 
     return best_cost;
 }

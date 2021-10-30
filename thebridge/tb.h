@@ -42,12 +42,12 @@ struct Params {
  * The mutable part of the game.
  */
 struct State {
-    Key key;
-    size_t pos;
-    size_t speed;
+    Key key{ 0 };
+    size_t pos{ 0 };
+    size_t speed{ 0 };
     Bikes bikes { 0, 0, 0, 0 };
-    int turn;
-    State* prev;
+    int turn{ 0 };
+    State* prev{ nullptr };
 };
 
 /**
@@ -57,13 +57,28 @@ class Game {
 public:
     Game() = default;
 
+    /// Initialize the game from an input stream
     void init(std::istream&);
-    void apply(const State&, Action a, State&) const;
-    const std::vector<Action>& valid_actions(const State&) const;
-    Params const* parameters() const;
-    State const* state() const;
-    void show(std::ostream& _out, const State& s) const;
 
+    /// Apply the action to cur_state and store the result in `next_state'
+    void apply(const State& cur_state, Action action, State& next_state) const;
+
+    /// Generate the list of valid actions for `state'
+    const std::vector<Action>& valid_actions(const State& state) const;
+
+    /// Get the position of the last hole on the road
+    int find_last_hole() const;
+
+    /// Get the game's parameters
+    Params const* parameters() const;
+
+    /// Get the game's root state
+    State const* state() const;
+
+    /// Send a representation of `state' to the output stream
+    void show(std::ostream& _out, const State& state) const;
+
+    /// Get the road
     const Road& get_road() const { return parameters()->road; }
 };
 

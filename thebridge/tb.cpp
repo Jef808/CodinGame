@@ -108,13 +108,6 @@ namespace {
                 pos_it = holes_end;
             }
         }
-
-        for (int i=0; i < 4; ++i) {
-            for (int j = 0; j < nex_holes[i].size(); ++j)
-                std::cout << nex_holes[i][j] << ' ';
-            std::cout << '\n';
-        }
-        std::cout << std::endl;
     }
 
     void input_turn(std::istream& _in, State& st)
@@ -219,6 +212,8 @@ void Game::apply(const State& state, Action a, State& s) const
     }
 
     ++s.turn;
+    if (s.pos >= params.road[0].size())
+        s.pos = params.road[0].size() - 1;
 
     s.key = Zobrist::key_pos[s.pos];
     s.key ^= Zobrist::get_key_bikes(s);
@@ -240,15 +235,6 @@ int n_conseq_holes()
     return res;
 }
 
-int n_conseq_holes2()
-{
-    int res = 0;
-    for (int i=0; i<4; ++i)
-        for (auto it = nex_holes[i].begin(); it != nex_holes[i].end() && *it < Max_length; ++it)
-            res = *it > res ? *it : res;
-    return res;
-}
-
 const std::vector<Action>& Game::valid_actions(const State& s) const
 {
     static const int longest_jump = n_conseq_holes();
@@ -261,7 +247,7 @@ const std::vector<Action>& Game::valid_actions(const State& s) const
 
     // Speed is our first choice, but we cap the speed
     // to reduce number of candidates
-    if (s.speed < longest_jump + 1)
+    if (s.speed < 2 * longest_jump - 1)
         out = Action::Speed;
 
     if (s.speed == 0) {
@@ -273,15 +259,28 @@ const std::vector<Action>& Game::valid_actions(const State& s) const
     // Cannot go up if 0 is occupied
     if (!s.bikes[0])
         out = Action::Up;
+
     // Cannot go down if 3 is occupied
-    if (s.bikes[3])
+    if (!s.bikes[3])
         out = Action::Down;
 
     // Don't stop the bikes
-    if (s.speed <= 1)
+    if (s.speed > 1)
         out = Action::Slow;
 
     return ret;
+}
+
+int Game::find_last_hole() const
+{
+    int _ret = Max_length;
+    for (int i=0; i<4; ++i) {
+        auto last_hole = std::distance(params.road[i].begin(),
+                                       std::find(params.road[i].begin(), params.road[i].end(), Max_length));
+        _ret = last_hole > _ret ? last_hole : _ret;
+    }
+    return _ret;
+
 }
 
 void Game::show(std::ostream& _out, const State& s) const
