@@ -42,7 +42,6 @@ struct Params {
  * The mutable part of the game.
  */
 struct State {
-    Key key{ 0 };
     size_t pos{ 0 };
     size_t speed{ 0 };
     Bikes bikes { 0, 0, 0, 0 };

@@ -25,26 +25,6 @@ namespace {
     void input_turn(std::istream& _in, tb::State& st);
 }
 
-namespace Zobrist {
-
-    std::array<uint32_t, 16> key_bikes {};
-    std::array<uint32_t, 500> key_pos {};
-    std::array<uint32_t, 50> key_speed {};
-    tb::Key get_key_bikes(const tb::State& st)
-    {
-        size_t lanes = 0;
-        for (int i = 0; i < 4; ++i) {
-            lanes += st.bikes[i] * (2 << i);
-        }
-        return key_bikes[lanes];
-    }
-    tb::Key get(const tb::State& st)
-    {
-        return get_key_bikes(st) ^ key_pos[st.pos] ^ key_speed[st.speed];
-    }
-
-} // namespace tb::Zobrist
-
 const State* Game::state() const { return &root_state; }
 const Params* Game::parameters() const { return &params; }
 
@@ -70,16 +50,6 @@ void Game::init(std::istream& _in)
     input_turn(_in, root_state);
 
     nex_holes_dists();
-
-    std::random_device rd;
-    std::mt19937 eng { rd() };
-    std::uniform_int_distribution<uint32_t> dist(1, std::numeric_limits<uint32_t>::max());
-    for (int i = 0; i < 16; ++i)
-        Zobrist::key_bikes[i] = dist(eng);
-    for (int i = 0; i < 500; ++i)
-        Zobrist::key_pos[i] = dist(eng);
-    for (int i = 0; i < 50; ++i)
-        Zobrist::key_speed[i] = dist(eng);
 }
 
 namespace {
@@ -119,7 +89,7 @@ namespace {
         for (int i = 0; i < params.start_bikes; ++i) {
             _in >> x >> y >> a;
             _in.ignore();
-            st.bikes[i] = (a == 1);
+            st.bikes[y] = (a == 1);
         }
         st.pos = x;
     }
@@ -133,14 +103,12 @@ namespace {
 
     inline void slow(State& s)
     {
-        s.key ^= (Zobrist::key_speed[s.speed] ^ Zobrist::key_speed[s.speed - 1]);
         --s.speed;
         wait(s);
     }
 
     inline void speed_up(State& s)
     {
-        s.key ^= (Zobrist::key_speed[s.speed] ^ Zobrist::key_speed[s.speed + 1]);
         ++s.speed;
         wait(s);
     }
@@ -186,8 +154,6 @@ namespace {
 void Game::apply(const State& state, Action a, State& s) const
 {
     s = state;
-    s.key ^= Zobrist::key_pos[s.pos];
-    s.key ^= Zobrist::get_key_bikes(state);
     switch (a) {
     // case Action::Wait:
     //     wait(s);
@@ -207,16 +173,18 @@ void Game::apply(const State& state, Action a, State& s) const
     case Action::Down:
         down(s);
         break;
-    default:
+    default: {
+        if (a == Action::None)
+            std::cerr << "Game: trying to apply Action::None"
+                << std::endl;
         assert(false);
+    }
+
     }
 
     ++s.turn;
     if (s.pos >= params.road[0].size())
         s.pos = params.road[0].size() - 1;
-
-    s.key = Zobrist::key_pos[s.pos];
-    s.key ^= Zobrist::get_key_bikes(s);
 }
 
 int n_conseq_holes()
@@ -247,7 +215,7 @@ const std::vector<Action>& Game::valid_actions(const State& s) const
 
     // Speed is our first choice, but we cap the speed
     // to reduce number of candidates
-    if (s.speed < 2 * longest_jump - 1)
+    if (s.speed < 2 * longest_jump)
         out = Action::Speed;
 
     if (s.speed == 0) {
@@ -273,10 +241,10 @@ const std::vector<Action>& Game::valid_actions(const State& s) const
 
 int Game::find_last_hole() const
 {
-    int _ret = Max_length;
+    int _ret = 0;
     for (int i=0; i<4; ++i) {
-        auto last_hole = std::distance(params.road[i].begin(),
-                                       std::find(params.road[i].begin(), params.road[i].end(), Max_length));
+        auto last_hole = std::distance(nex_holes[i].begin(),
+                                       std::find(nex_holes[i].begin(), nex_holes[i].end(), Max_length));
         _ret = last_hole > _ret ? last_hole : _ret;
     }
     return _ret;
@@ -294,8 +262,9 @@ void Game::show(std::ostream& _out, const State& s) const
         _out << (s.bikes[i] ? 'B' : (road[i][s.pos] == Cell::Hole ? '0' : '-'));
         for (int j = s.pos + 1; j < road[i].size(); ++j)
             _out << (road[i][j] == Cell::Hole ? '0' : '-');
-        _out << std::endl;
+        _out << '\n';
     }
+    _out << std::endl;
 }
 
 } // namespace tb

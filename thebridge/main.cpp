@@ -1,18 +1,42 @@
 #define RUNNING_OFFLINE 1
-#define EXTRACTING_ONLINE_DATA 0
 
 #include "tb.h"
 #include "agent.h"
 
+#include <cassert>
 #include <string>
 #include <iostream>
 #include <fstream>
 
+
+std::string buf;
+
 void ignore_turn(const tb::Game& game, std::istream& _in)
 {
-    std::string buf;
     for (int i = 0; i < game.parameters()->start_bikes + 1; ++i)
         std::getline(_in, buf);
+}
+
+std::ostream& operator<<(std::ostream& _out, tb::Action a)
+{
+    using tb::Action;
+        switch (a) {
+    // case Action::Wait:
+    //     wait(s);
+    //     break;
+    case Action::Slow:
+        return _out << "SLOW";
+    case Action::Speed:
+        return _out << "SPEED";
+    case Action::Jump:
+        return _out << "JUMP";
+    case Action::Up:
+        return _out << "UP";
+    case Action::Down:
+        return _out << "DOWN";
+    default:
+        assert(false);
+    }
 }
 
 
@@ -21,8 +45,6 @@ using namespace tb;
 int main(int argc, char* argv[])
 {
 #if RUNNING_OFFLINE
-
-    const int turn_time_ms = 0;
 
     if (argc < 2) {
         std::cerr << "Main: Input file needed!" << std::endl;
@@ -38,9 +60,11 @@ int main(int argc, char* argv[])
     Game game;
     game.init(ifs);
 
-#else
+    State state[2];
+    state[0] = state[1] = *game.state();
+    int count = 0;
 
-    const int turn_time_ms = 150;
+#else
 
     Game game;
     game.init(std::cin);
@@ -48,7 +72,43 @@ int main(int argc, char* argv[])
 #endif
 
     Agent agent;
-    agent.solve(game, turn_time_ms);
+    agent.init(game);
+    agent.search(game);
+
+    bool done = false;
+
+    while (!done) {
+
+        Action action = agent.best_action();
+
+#if RUNNING_OFFLINE
+
+        game.apply(state[count % 2], action, state[(count + 1) % 2]);
+        ++count;
+
+        bool lost = std::count(state[count % 2].bikes.begin(), state[count % 2].bikes.end(), 1) < game.parameters()->min_bikes;
+        bool won = state[count % 2].pos >= game.get_road()[0].size() - 1;
+
+        if (lost) {
+            std::cerr << "Lost" << std::endl;
+            done = true;
+        }
+        else if (won) {
+            std::cerr << "Won"
+                      << std::endl;
+            done = true;
+        }
+
+        std::cout << action << std::endl;
+        game.show(std::cout, state[count % 2]);
+
+#else
+        std::cout << action << std::endl;
+        ignore_turn(game, std::cin);
+
+#endif
+
+    }
 
     return EXIT_SUCCESS;
 }

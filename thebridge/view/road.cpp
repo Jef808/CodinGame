@@ -81,19 +81,19 @@ int main(int argc, char* argv[])
                         game.apply(*st, Action::Jump, *(st + 1));
                         ++st;
                         break;
-                    case sf::Keyboard::Up:
+                    case sf::Keyboard::K:
                         game.apply(*st, Action::Up, *(st + 1));
                         ++st;
                         break;
-                    case sf::Keyboard::Down:
+                    case sf::Keyboard::J:
                         game.apply(*st, Action::Down, *(st + 1));
                         ++st;
                         break;
-                    case sf::Keyboard::Right:
+                    case sf::Keyboard::L:
                         game.apply(*st, Action::Speed, *(st + 1));
                         ++st;
                         break;
-                    case sf::Keyboard::Left:
+                    case sf::Keyboard::H:
                         game.apply(*st, Action::Slow, *(st + 1));
                         ++st;
                         break;

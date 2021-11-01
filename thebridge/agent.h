@@ -3,30 +3,23 @@
 
 #include "tb.h"
 
-namespace tb {
+#include <iosfwd>
 
-struct ExtAction;
-struct Stack;
+namespace tb {
 
 class Agent {
 public:
-    using Cost = int;
 
     Agent() = default;
-    void solve(const Game& game, int time_limit_ms = 0);
-
-    Action next_action() const;
+    void init(const Game& game);
+    void search(const Game& game);
+    Action best_action() const;
 
 private:
     Game game;
-    int time_limit_ms { 0 };
-    int depth_searched{ 0 };
     mutable int actions_out_count{ 0 };
 
-    void init(const Game& game, int time_limit_ms);
-    const std::vector<ExtAction>& generate_actions(const State& s) const;
-
-    Cost depth_first_search(int depth, bool& timeout, Stack*) const;
+    bool depth_first_search(const State& state, int max_depth) const;
 };
 
 } // namespace tb
