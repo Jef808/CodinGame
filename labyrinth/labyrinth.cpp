@@ -3,7 +3,9 @@
 #include <cassert>
 #include <deque>
 #include <iostream>
+#include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 enum class Cell {
@@ -22,16 +24,24 @@ enum class Action {
     Down,
 };
 
+struct Point {
+    int x;
+    int y;
+};
+
 constexpr Action actions[5] { Action::None, Action::Left, Action::Up, Action::Right, Action::Down };
 constexpr int n_cells = 5;
 constexpr int n_actions = 4;
 std::ostream& operator<<(std::ostream& out, const Action action);
 std::ostream& operator<<(std::ostream& out, const Cell cell);
+std::ostream& operator<<(std::ostream& out, const Point point);
 
-struct State {
-    int x;
-    int y;
-};
+/// To insert into a std::set
+bool operator<(const Point& a, const Point& b) {
+    return a.y > b.y || a.x < b.x;
+}
+
+typedef Point State;
 
 class Game {
 public:
@@ -44,6 +54,9 @@ public:
         m_buf.reserve(m_width);
         m_grid.reserve(m_width * m_height);
         std::fill_n(std::back_inserter(m_grid), m_width * m_height, Cell::Unknown);
+        m_target_found = false;
+        m_target.x = -1;
+        m_target.y = -1;
     }
 
     /// Update the grid if we see new cells
@@ -66,9 +79,14 @@ public:
                     break;
                 case 'T':
                     cell_at(x, y) = Cell::Start;
+                    m_start.x = x;
+                    m_start.y = y;
                     break;
                 case 'C':
                     cell_at(x, y) = Cell::Target;
+                    m_target_found = true;
+                    m_target.x = x;
+                    m_target.y = y;
                     break;
                 default: {
                     std::cerr << "Game::turn_input: unknown character read"
@@ -100,19 +118,38 @@ public:
         return m_grid[x + y * m_width];
     }
 
-    const std::vector<Cell> grid() const { return m_grid; }
-
-    const State& state() const { return m_state; }
-    int width() const { return m_width; }
-    int height() const { return m_height; }
+    int width() const {
+        return m_width;
+    }
+    int height() const {
+        return m_height;
+    }
+    const std::vector<Cell> grid() const {
+        return m_grid;
+    }
+    const State& state() const {
+        return m_state;
+    }
+    bool target_found() const {
+        return m_target_found;
+    }
+    const Point& target() const {
+        return m_target;
+    }
+    const Point& start() const {
+        return m_start;
+    }
 
 private:
     std::vector<Cell> m_grid;
     std::string m_buf;
-    State m_state;
     int m_width;
     int m_height;
     int going_back_limit;
+    State m_state;
+    bool m_target_found;
+    Point m_start;
+    Point m_target;
 };
 
 class Agent {
@@ -120,37 +157,6 @@ public:
     Agent(Game& _game)
         : game(_game)
     {
-    }
-
-    bool is_unsafe(int x, int y)
-    {
-        Cell cell = game.cell_at(x, y);
-        return cell == Cell::Unknown || cell == Cell::Wall;
-    }
-
-    template <Action action>
-    bool is_safe(const State& state)
-    {
-        bool ret = true;
-        if constexpr (action == Action::Left) {
-            ret &= state.x > 0;
-            ret &= !is_unsafe(state.x - 1, state.y);
-        } else if constexpr (action == Action::Up) {
-            ret &= state.y > 0;
-            ret &= !is_unsafe(state.x, state.y - 1);
-        } else if constexpr (action == Action::Right) {
-            ret &= state.x < game.width() - 1;
-            ret &= !is_unsafe(state.x + 1, state.y);
-        } else if constexpr (action == Action::Down) {
-            ret &= state.x < game.height() - 1;
-            ret &= !is_unsafe(state.x, state.y + 1);
-        } else {
-            std::cerr << "Agent::is_safe: unknown action"
-                      << std::endl;
-            assert(false);
-        }
-
-        return ret;
     }
 
     Action best_action()
@@ -185,8 +191,106 @@ private:
     const Game& game;
     std::vector<Action> m_buf;
     std::deque<Action> best_actions;
-};
+    std::vector<Point> fog_boundary;
+    std::vector<Point> fog_buffer;
 
+    void shortest_path(int x_start, int y_start, int x_target, int y_target)
+    {
+
+    }
+
+    void update_fog_boundary()
+    {
+        if (fog_boundary.empty())
+            return;
+
+        std::set<Point> seen;
+        fog_buffer.clear();
+        auto fog_inserter = std::back_inserter(fog_buffer);
+
+        for (const Point& current : fog_boundary) {
+
+            /// Mark as fog and don't look at neighbours if cell is still fog
+            if (game.cell_at(current.x, current.y) == Cell::Unknown) {
+                auto [it, not_seen] = seen.insert({current.x, current.y});
+                if (not_seen)
+                    fog_inserter = current;
+                continue;
+            }
+
+            /// Look at four neighbours for newly discovered cells
+            for (auto [dx, dy] : { std::make_pair(-1, 0), std::make_pair(0, -1),
+                    std::make_pair(1, 0), std::make_pair(0, 1)} ) {
+                if (game.cell_at(current.x + dx, current.y + dy) == Cell::Unknown) {
+                    auto [it, not_seen] = seen.insert({ current.x, current.y });
+                    if (not_seen)
+                        fog_inserter = { current.x + dx, current.y + dy };
+                }
+            }
+        }
+
+        std::swap(fog_boundary, fog_buffer);
+    }
+
+    /// Add the outside cells of a 5x5 box centered at starting position
+    void init_fog_boundary()
+    {
+        fog_boundary.reserve(4 * game.width() * game.height());
+        fog_buffer.reserve(4 * game.width() * game.height());
+
+        int startx = game.start().x, starty = game.start().y;
+
+        /// Top and bottom sides
+        for (int y : { starty - 3, starty + 3 }) {
+            if (y < 0 || y >= game.height())
+                continue;
+            for (int x = std::max(startx - 3, 0); x < std::min(startx + 4, game.width()); ++x) {
+                    continue;
+                fog_boundary.push_back({ x, y });
+            }
+
+        }
+
+        /// Left and Right sides (avoiding the corners)
+        for (int x : { startx - 3, startx + 3}) {
+            if (x < 0 || x >= game.width())
+                continue;
+            for (int y = std::max(starty - 2, 0); y < std::min(starty + 3, game.width()); ++y)
+                fog_boundary.push_back({ x, y });
+        }
+    }
+
+    bool is_unsafe(int x, int y)
+    {
+        Cell cell = game.cell_at(x, y);
+        return cell == Cell::Unknown || cell == Cell::Wall;
+    }
+
+    template <Action action>
+    bool is_safe(const State& state)
+    {
+        bool ret = true;
+        if constexpr (action == Action::Left) {
+            ret &= state.x > 0;
+            ret &= !is_unsafe(state.x - 1, state.y);
+        } else if constexpr (action == Action::Up) {
+            ret &= state.y > 0;
+            ret &= !is_unsafe(state.x, state.y - 1);
+        } else if constexpr (action == Action::Right) {
+            ret &= state.x < game.width() - 1;
+            ret &= !is_unsafe(state.x + 1, state.y);
+        } else if constexpr (action == Action::Down) {
+            ret &= state.x < game.height() - 1;
+            ret &= !is_unsafe(state.x, state.y + 1);
+        } else {
+            std::cerr << "Agent::is_safe: unknown action"
+                      << std::endl;
+            assert(false);
+        }
+
+        return ret;
+    }
+};
 
 std::ostream& operator<<(std::ostream& out, const Cell cell)
 {
@@ -207,6 +311,12 @@ std::ostream& operator<<(std::ostream& out, const Cell cell)
         assert(false);
     }
     }
+}
+
+std::ostream& operator<<(std::ostream& out, const Point point)
+{
+    return out << '('  << point.x
+               << ", " << point.y << ')';
 }
 
 std::ostream& operator<<(std::ostream& out, const Action action)
