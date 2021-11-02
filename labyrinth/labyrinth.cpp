@@ -5,7 +5,7 @@
 #include <iostream>
 #include <set>
 #include <string>
-#include <utility>
+#include <tuple>
 #include <vector>
 
 enum class Cell {
@@ -30,33 +30,51 @@ struct Point {
 };
 
 constexpr Action actions[5] { Action::None, Action::Left, Action::Up, Action::Right, Action::Down };
-constexpr int n_cells = 5;
 constexpr int n_actions = 4;
+
 std::ostream& operator<<(std::ostream& out, const Action action);
 std::ostream& operator<<(std::ostream& out, const Cell cell);
 std::ostream& operator<<(std::ostream& out, const Point point);
 
 /// To insert into a std::set
 bool operator<(const Point& a, const Point& b) {
-    return a.y > b.y || a.x < b.x;
+    return a.y < b.y || (a.y == b.y && a.x < b.x);
 }
-
-typedef Point State;
+bool operator==(const Point& a, const Point& b) {
+    return a.x == b.x && a.y == b.y;
+}
+Point operator+(const Point& a, const Point& b) {
+    return { a.x + b.x, a.y + b.y };
+}
+Point& operator+=(Point& p, const Point& dp) {
+    p = p + dp;
+    return p;
+}
 
 class Game {
 public:
+
     Game() = default;
 
-    /// Initial input containing the game's parameters
+    /// Initialize the grid and the game's parameters
     void init_input(std::istream& _in)
     {
-        _in >> m_height >> m_width >> going_back_limit;
+        _in >> m_height >> m_width >> going_back_alarm_time;
         m_buf.reserve(m_width);
-        m_grid.reserve(m_width * m_height);
-        std::fill_n(std::back_inserter(m_grid), m_width * m_height, Cell::Unknown);
+        m_grid.reserve((m_width + 2) * (m_height + 2));
+        std::fill_n(std::back_inserter(m_grid), (m_width + 2) * (m_height + 2), Cell::Unknown);
         m_target_found = false;
         m_target.x = -1;
         m_target.y = -1;
+
+        // Add a layer of walls around the grid to make checking for out of bound positions
+        // unnecessary
+        for (int x = 0; x < m_width + 2; ++x) {
+            m_grid[x] = m_grid[x + (m_height + 2 - 1) * (m_width + 2)] = Cell::Wall;
+        }
+        for (int y = 1; y < m_height + 1; ++y) {
+            m_grid[y * (m_width + 2)] = m_grid[(y + 1) * (m_width + 2) - 1] = Cell::Wall;
+        }
     }
 
     /// Update the grid if we see new cells
@@ -68,6 +86,8 @@ public:
             std::getline(_in, m_buf);
             for (int x = 0; x < m_width; ++x) {
                 char c = m_buf[x];
+                if (cell_at(x, y) != Cell::Unknown)
+                    continue;
                 switch (c) {
                 case '?':
                     break;
@@ -107,17 +127,13 @@ public:
         }
         out << std::endl;
     }
-
-    Cell& cell_at(int x, int y)
-    {
-        return m_grid[x + y * m_width];
+    int index_of(const Point& p) const {
+        return p.x + p.y * m_width;
     }
-
     Cell cell_at(int x, int y) const
     {
-        return m_grid[x + y * m_width];
+        return m_grid[(x + 1) + (y + 1) * (m_width + 2)];
     }
-
     int width() const {
         return m_width;
     }
@@ -127,7 +143,7 @@ public:
     const std::vector<Cell> grid() const {
         return m_grid;
     }
-    const State& state() const {
+    const Point& state() const {
         return m_state;
     }
     bool target_found() const {
@@ -145,11 +161,16 @@ private:
     std::string m_buf;
     int m_width;
     int m_height;
-    int going_back_limit;
-    State m_state;
+    int going_back_alarm_time;
+    Point m_state;
     bool m_target_found;
     Point m_start;
     Point m_target;
+
+    Cell& cell_at(int x, int y)
+    {
+        return m_grid[(x + 1) + (y + 1) * (m_width + 2)];
+    }
 };
 
 class Agent {
@@ -157,138 +178,161 @@ public:
     Agent(Game& _game)
         : game(_game)
     {
+        reached_target = false;
+        max_distance = game.width() * game.height();
+        gradient.reserve(game.width() * game.height());
+        fog_boundary.reserve(4 * (game.width() + game.height()));
     }
 
     Action best_action()
     {
-        m_buf.clear();
-        auto inserter = std::back_inserter(m_buf);
-        const State& state = game.state();
+        Action action;
+        bool found_path = false;
 
-        if (is_safe<actions[1]>(game.state())) {
-            inserter = actions[1];
-        }
-        if (is_safe<actions[2]>(game.state())) {
-            inserter = actions[2];
-        }
-        if (is_safe<actions[3]>(game.state())) {
-            inserter = actions[3];
-        }
-        if (is_safe<actions[4]>(game.state())) {
-            inserter = actions[4];
+        if (game.target_found()) {
+            reached_target |= game.state() == game.target();
+            if (!reached_target) {
+                std::cerr << "Going towards target" << std::endl;
+                std::tie(action, found_path) = go_towards(game.target());
+            }
+            else {
+                std::cerr << "Going towards start" << std::endl;
+                std::tie(action, found_path) = go_towards(game.start());
+            }
         }
 
-        if (m_buf.empty()) {
-            std::cerr << "Agent::best_action: no actions available"
-                      << std::endl;
-            assert(false);
+        if (!found_path) {
+            std::cerr << "Going towards nearest fog" << std::endl;
+            action = towards_nearest_fog();
         }
 
-        return m_buf[rand() % m_buf.size()];
+        return action;
     }
 
 private:
     const Game& game;
-    std::vector<Action> m_buf;
-    std::deque<Action> best_actions;
     std::vector<Point> fog_boundary;
-    std::vector<Point> fog_buffer;
+    std::vector<int> gradient;
+    Point offsets[4] { {-1, 0}, {0, -1}, {1, 0}, {0, 1} };
+    int max_distance;
+    bool reached_target;
 
-    void shortest_path(int x_start, int y_start, int x_target, int y_target)
+    /// Mark the distances from the source to each discovered and fog-boundary points
+    void compute_gradient(const Point& source)
     {
+        gradient.clear();
+        fog_boundary.clear();
 
+        std::fill_n(std::back_inserter(gradient), game.width() * game.height(), max_distance);
+
+        std::set<Point> seen({source});
+        std::deque<Point> queue({source});
+
+        gradient[game.index_of(source)] = 0;
+
+        while (!queue.empty()) {
+
+            Point point = queue.front();
+            int distance = gradient[game.index_of(point)];
+            queue.pop_front();
+
+            for (const auto& dp : offsets) {
+
+                auto [nbh, not_seen] = seen.insert(point + dp);
+
+                if (!not_seen || is_wall(*nbh))
+                    continue;
+
+                gradient[game.index_of(*nbh)] = distance + 1;
+
+                if (is_fog(*nbh))
+                    fog_boundary.push_back(*nbh);
+                else
+                    queue.push_back(*nbh);
+            }
+        }
     }
 
-    void update_fog_boundary()
+    /// Get the direction to the nearest fog square
+    Action towards_nearest_fog()
     {
-        if (fog_boundary.empty())
-            return;
+        compute_gradient(game.state());
 
-        std::set<Point> seen;
-        fog_buffer.clear();
-        auto fog_inserter = std::back_inserter(fog_buffer);
+        Point target = *std::min_element(fog_boundary.begin(), fog_boundary.end(), [&](const auto& a, const auto& b){
+            return gradient[game.index_of(a)] < gradient[game.index_of(b)];
+        });
 
-        for (const Point& current : fog_boundary) {
+        auto [action, found] = go_towards(target);
 
-            /// Mark as fog and don't look at neighbours if cell is still fog
-            if (game.cell_at(current.x, current.y) == Cell::Unknown) {
-                auto [it, not_seen] = seen.insert({current.x, current.y});
-                if (not_seen)
-                    fog_inserter = current;
-                continue;
-            }
+        if (!found) {
+            std::cerr << "Agent::to_nearest_fog: couldn't find a path"
+                << std::endl;
+            assert(false);
+        } else {
+            return action;
+        }
+    }
 
-            /// Look at four neighbours for newly discovered cells
-            for (auto [dx, dy] : { std::make_pair(-1, 0), std::make_pair(0, -1),
-                    std::make_pair(1, 0), std::make_pair(0, 1)} ) {
-                if (game.cell_at(current.x + dx, current.y + dy) == Cell::Unknown) {
-                    auto [it, not_seen] = seen.insert({ current.x, current.y });
-                    if (not_seen)
-                        fog_inserter = { current.x + dx, current.y + dy };
+    std::pair<Action, bool> go_towards(const Point& target)
+    {
+        compute_gradient(target);
+        Action action = shortest_path(game.state(), target);
+
+        return { action, action != Action::None };
+    }
+
+    Action shortest_path(const Point& start, const Point& end)
+    {
+        int distance = gradient[game.index_of(start)];
+        Point p = start;
+
+        Action first_action = Action::None;
+
+        while (distance > 0) {
+
+            bool found_closer_point = false;
+
+            for (int j = 0; j < 4; ++j) {
+
+                Point cand = p + offsets[j];
+
+                // check distance > 1 because we could be targeting a fog point
+                if (distance > 1 && is_fog(cand))
+                    continue;
+
+                int cand_dist = gradient[game.index_of(cand)];
+
+                // If found direction reducing distance
+                if (cand_dist == distance - 1) {
+
+                    found_closer_point = true;
+
+                    // Record the first action
+                    if (first_action == Action::None)
+                        first_action = actions[j + 1];
+
+                    p = cand;
+                    distance = cand_dist;
+                    break;
                 }
             }
+
+            // If no candidates were found with shorter distance, fail
+            if (!found_closer_point)
+                return Action::None;
         }
 
-        std::swap(fog_boundary, fog_buffer);
+        return first_action;
     }
 
-    /// Add the outside cells of a 5x5 box centered at starting position
-    void init_fog_boundary()
+    bool is_wall(const Point& point)
     {
-        fog_boundary.reserve(4 * game.width() * game.height());
-        fog_buffer.reserve(4 * game.width() * game.height());
-
-        int startx = game.start().x, starty = game.start().y;
-
-        /// Top and bottom sides
-        for (int y : { starty - 3, starty + 3 }) {
-            if (y < 0 || y >= game.height())
-                continue;
-            for (int x = std::max(startx - 3, 0); x < std::min(startx + 4, game.width()); ++x) {
-                    continue;
-                fog_boundary.push_back({ x, y });
-            }
-
-        }
-
-        /// Left and Right sides (avoiding the corners)
-        for (int x : { startx - 3, startx + 3}) {
-            if (x < 0 || x >= game.width())
-                continue;
-            for (int y = std::max(starty - 2, 0); y < std::min(starty + 3, game.width()); ++y)
-                fog_boundary.push_back({ x, y });
-        }
+        return game.cell_at(point.x, point.y) == Cell::Wall;
     }
 
-    bool is_unsafe(int x, int y)
+    bool is_fog(const Point& point)
     {
-        Cell cell = game.cell_at(x, y);
-        return cell == Cell::Unknown || cell == Cell::Wall;
-    }
-
-    template <Action action>
-    bool is_safe(const State& state)
-    {
-        bool ret = true;
-        if constexpr (action == Action::Left) {
-            ret &= state.x > 0;
-            ret &= !is_unsafe(state.x - 1, state.y);
-        } else if constexpr (action == Action::Up) {
-            ret &= state.y > 0;
-            ret &= !is_unsafe(state.x, state.y - 1);
-        } else if constexpr (action == Action::Right) {
-            ret &= state.x < game.width() - 1;
-            ret &= !is_unsafe(state.x + 1, state.y);
-        } else if constexpr (action == Action::Down) {
-            ret &= state.x < game.height() - 1;
-            ret &= !is_unsafe(state.x, state.y + 1);
-        } else {
-            std::cerr << "Agent::is_safe: unknown action"
-                      << std::endl;
-            assert(false);
-        }
-
-        return ret;
+        return game.cell_at(point.x, point.y) == Cell::Unknown;
     }
 };
 
@@ -346,8 +390,6 @@ int main(int argc, char* argv[])
     game.turn_input(std::cin);
 
     Agent agent(game);
-
-    game.show(std::cerr);
 
     while (true) {
         Action action = agent.best_action();
