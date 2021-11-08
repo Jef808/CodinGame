@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+
+timestamp="timestamp.dummy"
+touch $timestamp
+
+while true; do
+    for f in $(cat ../scripts/files.txt); do
+        if [[ "../$f" -nt ${timestamp} ]]; then
+           echo "$f has been updated... rebuilding"
+           make -k all
+           touch $timestamp
+           break;
+        fi
+    done
+    sleep 2;
+done
