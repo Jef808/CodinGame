@@ -1,13 +1,18 @@
 #include <algorithm>
 #include <cassert>
 #include <iostream>
+#include <sstream>
 
 #include "breakthrough.h"
 
 StateInfo root_state;
 int n_legal_moves;
 std::vector<Move> m_valid_moves;
+std::vector<Square> square_buf;
 std::string m_buf;
+std::string view_buf;
+std::string ssquare_buf;
+std::string smove_buf;
 Square offsets[2][3] {
     { { -1, 1 }, { 0, 1 }, { 1, 1 } }, // Moves for white
     { { -1, -1 }, { 0, -1 }, { 1, -1 } } // Moves for black
@@ -16,6 +21,7 @@ constexpr int white_row = 0;
 constexpr int black_row = 7;
 
 std::ostream& operator<<(std::ostream& out, const Cell cell);
+std::ostream& operator<<(std::ostream& out, const Square square);
 std::ostream& operator<<(std::ostream& out, const Move move);
 
 Game::Game() {
@@ -78,20 +84,51 @@ void Game::turn_init(std::istream& is, StateInfo& st) {
     }
 }
 
-std::string_view Game::make_move(const Move& move) const
-{
-    m_buf.clear();
-    auto out = std::back_inserter(m_buf);
-
-    out = move.from.col + 97;
-    out = move.from.row + 49;
-    out = move.to.col + 97;
-    out = move.to.row + 49;
-
-    return m_buf;
+void Game::set_board(std::string_view s, Player to_move) {
+    for (int row = height - 1; row >= 0; --row) {
+        for (int col = 0; col < width; ++col) {
+            Cell& c = cell_at(col, row);
+            switch(s[col + (7 - row) * width]) {
+                case '.':
+                    c = Cell::Empty; break;
+                case 'W':
+                    c = Cell::White; break;
+                case 'B':
+                    c = Cell::Black; break;
+                default:
+                    std::cerr << "Game::set_state: unknown character read: "
+                        << s[col + (7 - row) * width] << std::endl;
+                    assert(false);
+            }
+        }
+    }
+    m_player_to_move = to_move;
 }
 
-Move Game::get_move(std::string_view s) const
+std::string_view Game::view_square(const Square& sq)
+{
+    ssquare_buf.clear();
+    auto out = std::back_inserter(ssquare_buf);
+
+    out = sq.col + 97;
+    out = sq.row + 49;
+
+    return ssquare_buf;
+}
+
+std::string_view Game::view_move(const Move& move)
+{
+    std::stringstream ss;
+
+    ss << view_square(move.from);
+    ss << view_square(move.to);
+
+    smove_buf = ss.str();
+
+    return smove_buf;
+}
+
+Move Game::get_move(std::string_view s)
 {
     Move ret {};
     char col = s[0];
@@ -103,14 +140,18 @@ Move Game::get_move(std::string_view s) const
     return ret;
 }
 
-void Game::show(std::ostream& out) const
+std::string_view Game::view() const
 {
-    bool reverse_view = m_player == Player::White;
+    std::ostringstream out;
 
-    for (int row = 0; row < height; ++row) {
-        out << (reverse_view ? 8 - row : row + 1) << "  ";
+    out << "       "
+        << (m_player_to_move == Player::White ? "WHITE " : "BLACK ")
+        << "to play\n";
+
+    for (int row = height - 1; row >= 0; --row) {
+        out << row + 1 << "  ";
         for (int col = 0; col < width; ++col) {
-            out << cell_at(col, reverse_view ? row_reversed(row) : row);
+            out << cell_at(col, row);
         }
         out << '\n';
     }
@@ -121,6 +162,10 @@ void Game::show(std::ostream& out) const
     }
     out << '\n'
         << std::endl;
+
+    view_buf = out.str();
+
+    return view_buf;
 }
 
 /// Return true if game is won from the point of view of the last player that moved
@@ -182,8 +227,8 @@ void Game::undo(const Move& move)
 
 void Game::compute_valid_moves() const
 {
-    const auto& _offsets = offsets[player_to_move() == Player::White ? 0 : 1];
     m_valid_moves.clear();
+    const auto& _offsets = offsets[player_to_move() == Player::White ? 0 : 1];
     auto out = std::back_inserter(m_valid_moves);
 
     for (int row = 0; row < height; ++row) {
@@ -206,6 +251,15 @@ void Game::compute_valid_moves() const
             }
         }
     }
+}
+
+Game::square_range Game::pawns_of(Player p) const {
+    square_buf.clear();
+    for (int row = 0; row < height; ++row)
+        for (int col = 0; col < width; ++col)
+            if (cell_at(col, row) == cell_of(p))
+                square_buf.push_back({ col, row });
+    return std::make_pair(square_buf.begin(), square_buf.end());
 }
 
 Game::valid_move_range Game::valid_moves() const {
@@ -233,10 +287,10 @@ bool Game::test_move_gen(bool display) const {
     if (display) {
         std::cerr << "Game moves:\n";
         for (auto it = game_mv; it != buf.end(); ++it)
-            std::cerr << make_move(*it) << ' ';
+            std::cerr << Game::view_move(*it) << ' ';
         std::cerr << "\nMy moves:\n";
         for (auto it = my_mv; it != m_valid_moves.end(); ++it)
-            std::cerr << make_move(*it) << ' ';
+            std::cerr << Game::view_move(*it) << ' ';
         std::cerr << std::endl;
     }
 
@@ -245,9 +299,9 @@ bool Game::test_move_gen(bool display) const {
     {
         if (*game_mv != *my_mv) {
             std::cerr << "Error: "
-                << make_move(*game_mv)
+                << Game::view_move(*game_mv)
                 << " != "
-                << make_move(*my_mv)
+                << Game::view_move(*my_mv)
                 << std::endl;
             return false;
         }
@@ -255,12 +309,14 @@ bool Game::test_move_gen(bool display) const {
     return true;
 }
 
+std::ostream& operator<<(std::ostream& out, const Square square)
+{
+    return out << Game::view_square(square);
+}
+
 std::ostream& operator<<(std::ostream& out, const Move move)
 {
-    return out << "From: (" << move.from.col
-               << ", " << move.from.row << ')'
-               << " To: (" << move.to.col
-               << ", " << move.to.row << ')' << std::endl;
+    return out << Game::view_move(move);
 }
 
 std::ostream& operator<<(std::ostream& out, const Cell cell)

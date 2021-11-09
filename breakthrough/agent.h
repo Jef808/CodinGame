@@ -6,9 +6,19 @@ class Agent {
     struct ExtMove {
         Move move;
         int value;
+        ExtMove()
+            : move{ Move_None }
+            , value{ -32001 }
+        {
+        }
         explicit ExtMove(Move _move)
-            : move { _move }
-            , value { -32001 }
+            : move{ _move }
+            , value{ -32001 }
+        {
+        }
+        ExtMove(Move m, int v)
+            : move{ m }
+            , value{ v }
         {
         }
         operator Move() const {
@@ -34,9 +44,17 @@ class Agent {
 
 public:
     Agent(Game&);
-    Move simple_best_move(bool debug = false);
-    Move best_move(int search_width, int search_depth);
+    /** Pick the the move maximizing the result of the score_move() method */
+    Move simple_best_move();
+
+    /** Same as simple_best_move but run minimax at depth `search_depth' to pick the best move */
+    Move best_move(int search_depth, int search_width = max_n_moves);
+
+    /** Generate root moves and order them wrt to the score_move() method */
     void make_root();
+
+    /** Test method for checking for passed pawns */
+    void debug();
 
 private:
     Game& game;
@@ -45,6 +63,9 @@ private:
     StateInfo states[max_depth];
     int n_evals = 0;
 
+    /** Witout alpha beta pruning */
+    int simple_eval_minimax(int depth, Stack* ss);
+
+    /** With alpha beta pruning */
     int eval_minimax(int alpha, int beta, int depth, int width, Stack* ss);
-    int score_move(const Move&, bool debug = false) const;
 };

@@ -1,6 +1,8 @@
 types.h
 breakthrough.h
 breakthrough.cpp
+eval.h
+eval.cpp
 agent.h
 agent.cpp
 main.cpp

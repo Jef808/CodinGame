@@ -21,11 +21,14 @@ class Game {
 public:
     using valid_move_iterator = std::vector<Move>::const_iterator;
     using valid_move_range = std::pair<valid_move_iterator, valid_move_iterator>;
+    using square_iterator = std::vector<Square>::const_iterator;
+    using square_range = std::pair<square_iterator, square_iterator>;
 
     Game();
     void init(std::istream&);
     void turn_init(std::istream&, StateInfo&);
-    void show(std::ostream&) const;
+    void set_board(std::string_view, Player to_move);
+    std::string_view view() const;
     void apply(const Move&, StateInfo&);
     void undo(const Move&);
     void compute_valid_moves() const;
@@ -33,10 +36,12 @@ public:
     valid_move_range valid_moves() const;
     bool is_won();
     Player player_to_move() const;
+
     bool is_capture(const Move&) const;
     int turn_number() const;
-    std::string_view make_move(const Move&) const;
-
+    static std::string_view view_move(const Move&);
+    static std::string_view view_square(const Square&);
+    square_range pawns_of(Player) const;
     Cell cell_at(int col, int row) const;
     Cell cell_at(const Square&) const;
     int index_of(const Square&) const;
@@ -51,7 +56,7 @@ private:
     Player m_player;
     StateInfo* st;
 
-    Move get_move(std::string_view) const;
+    static Move get_move(std::string_view);
     Cell& cell_at(int col, int row);
     int row_reversed(int row) const;
 };
