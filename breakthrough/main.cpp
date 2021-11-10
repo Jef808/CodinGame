@@ -19,7 +19,7 @@ int main(int argc, char* argv[])
     game.init(std::cin);
 
     Agent agent(game);
-    int s_depth = 1;
+    int s_depth = 3;
     int s_width = max_n_moves;
 
     StateInfo states[max_depth];
@@ -29,8 +29,8 @@ int main(int argc, char* argv[])
     while (!done) {
 
         //Move move = agent.simple_best_move(debug_eval);
+        //Move move = agent.best_move(s_depth, s_width);
         Move move = agent.best_move(s_depth, s_width);
-
         std::cout << Game::view_move(move) << std::endl;
 
         game.apply(move, *st++);

@@ -59,18 +59,23 @@
     {
         make_root();
 
-        //NOTE: Say I just output a move so that I will win on the next turn.
-        // Then main calls best_move again and the root_moves are completely reset.
-        // So without any move ordering scheme, the search will just pick a random
-        // move first (rn they show up in lexicographic order so bottom-left corner first)
+        // NOTE: The problem I always keep recreating is because of what follows:
+        // If a move results in a "Win in 1 move" state, I return MAX_SCORE - 1.
+        // But after applying that move, because of how the evaluation function works,
+        // applying ANY other action that doesn't win instantly also returns MAX_SCORE - 1
+        // ( the evaluation just checks for a pawn at the second-to-last row... )
+        // So if the root_moves are cleared between the calls to `best_move` and nothing is
+        // kept in memory, the agent will simply output actions in the random order they are
+        // presented to it. As a result, the opponent can find the time to win before I randomly
+        // stumble on the right action for winning myself.
         //
-        // But after applying that random action, the eval function will find the pawn that's
-        // one row off the end of the board and return "WIN IN ONE"! So then I will classify
-        // that action as the best one and only *sometimes* be lucky enough that the actual
-        // winning action gets picked.
+        // SOLUTION: I made sure to early return MAX_SCORE in the minimax() function so that it
+        // will overwrite all the other MAX_SCORE - 1 results. However, I still need to search for that
+        // right move even though I just found it. What is needed is some kind of history mechanism
+        // or a hash table.
         //
-        // TODO: Keep the best line in memory throughout calls to best_move, or find a way
-        // to overwrite that random "winning" action if I find another one that wins faster
+        // BASIC IDEA: When overwriting a value in the root_nodes, also save the best follow-up move
+        // if it is available as member data of the Agent class.
 
         Stack stack[max_depth];
         Stack* ss = &stack[0];
@@ -85,8 +90,8 @@
 
         for (int depth = 0; depth < s_depth; ++depth) {
 
-            int best_score = simple_eval_minimax(s_depth, ss);
-            //int best_score = eval_minimax(alpha, beta, s_depth, s_width, ss);
+            //int best_score = simple_eval_minimax(s_depth, ss);
+            int best_score = eval_minimax(alpha, beta, s_depth, s_width, ss);
 
             std::cerr << "depth " << depth
                 << " score: " << best_score
@@ -97,10 +102,15 @@
             assert(root_moves[0].value == best_score);
 
         }
-
         return root_moves[0];
     }
 
+
+    /**
+     * Brute-force minimax implementation.
+     *
+     * NOTE: This cannot handle depth more than 1 or 2 as it is...
+     */
     int Agent::simple_eval_minimax(int s_depth, Stack* ss)
     {
         const bool at_root = ss->depth == 0;
@@ -174,18 +184,20 @@
         return best_score - ss->depth;
     }
 
+    /**
+     * The main alpha beta minimax method
+     */
     int Agent::eval_minimax(int alpha, int beta, int s_depth, int s_width, Stack* ss)
     {
         const bool at_root = ss->depth == 0;
-        ss->move_count = 0;
         ++n_evals;
 
-        if (game.is_won())
-        {
-            if (at_root)
-                return 32000;
+        bool won_game = game.player_to_move() == Player::White
+            ? game.has_won<Player::Black>()
+            : game.has_won<Player::White>();
 
-            return -32000 + ss->depth;
+        if (won_game) {
+            return at_root ? 32000 : -32000;
         }
 
         std::array<Move, max_n_moves> moves;
@@ -195,58 +207,67 @@
         auto [beg, end] = game.valid_moves();
         std::copy(beg, end, moves.begin());
 
+        // terminal state should get detected at the is_won() check
         const int n_moves = std::distance(beg, end);
-
         assert(n_moves > 0);
-
-        StateInfo st;
-        (ss+1)->depth = ss->depth + 1;
 
         int best_score = -32001;
         Move best_move = Move_None;
+        ss->move_count = 0;
+        StateInfo st{};
+        (ss + 1)->depth = ss->depth + 1;
 
         for (auto it = moves.begin(); it != moves.begin() + n_moves; ++it) {
-
             ++ss->move_count;
+            int score = best_score;
 
             game.apply(*it, st);
-            int score = s_depth == 0
-                ? -Eval::evaluate(game)
-                : -eval_minimax(-beta, -alpha, s_depth - 1, s_width, ss + 1);
+            if (s_depth == 0) {
+                score = -Eval::evaluate(game);
+
+                // Adjust scores with a penalty for winning moves that are deep into the tree
+                if (score >= 32000 - max_depth)
+                    score -= ss->depth;
+
+                else if (score <= -32000 + max_depth)
+                    score += ss->depth;
+            }
+            // General depth
+            else
+                score = -eval_minimax(-beta, -alpha, s_depth - 1, s_width, ss + 1);
+
             game.undo(*it);
 
             assert( -32001 < score  && score < 32001 );
 
-            // Update the root moves in case we just found a new best move
-            if (at_root) {
-                ExtMove& rm = *std::find(root_moves.begin(),
-                                         root_moves.end(), *it);
-
-                if (score > alpha || ss->move_count == 1)
-                    rm.value = score;
-            }
-
-            // Update the search results
+            // Finished searching a branch, update the search results
             if (score > best_score) {
 
                 best_score = score;
 
+                // Found a new best move
                 if (score > alpha) {
 
                     best_move = *it;
-
-                    if (score < beta)
-
-                        alpha = score;  // Tighten up the window
-                    else
-                    {
-                        break;  // beta cutoff: the score was so that the
-                                // opponent would skip this node with best play
+                    if (at_root) {
+                        // Update the value in case of a root_move
+                        ExtMove& rm = *std::find(root_moves.begin(),
+                                                 root_moves.end(), *it);
+                            rm.value = score;
                     }
+
+                    // If we're deeper in the tree, adjust the data to be propagated while searching
+                    // other subbranches, or prune all other subbranches in case of a beta cut-off.
+                    if (score < beta)
+                        alpha = score;  // Tighten the window
+                    else
+                        break;
                 }
             }
         }
         // Went through all moves now
+        // TODO: Save the best move to some kind of pv history
+        //
         // NOTE: We could make the necessary checks for when there was no moves available here.
         // Be there that there's a bug or the game is already won. In Stockfish, they also update
         // meta-search statistics here since in case the search failed to prune this node even though
