@@ -138,17 +138,20 @@ private:
     template<>
     int Evaluation<Tracing::None>::score() {
 
-        int score = game.board_score() + game.material_imbalance();
+        int score = 0;
         {
             int wpp_eval = evaluate_passed_pawns<Player::White>();
             int bpp_eval = evaluate_passed_pawns<Player::Black>();
 
-            if (std::max(abs(wpp_eval), abs(bpp_eval)) >= 32000 - 1) {
-                return game.player_to_move() == Player::White ? wpp_eval : bpp_eval;
+            if (std::max(abs(wpp_eval), abs(bpp_eval)) >= 32000 - max_depth) {
+                int ret = game.player_to_move() == Player::White ? wpp_eval : bpp_eval;
+                return ret;
             }
 
             score += wpp_eval - bpp_eval;
         }
+
+        score += game.board_score() + game.material_imbalance();
 
         for (auto [it, end] = game.pawns_of(Player::White); it != end; ++it) {
             score += connected_bonus<Player::White>(*it);

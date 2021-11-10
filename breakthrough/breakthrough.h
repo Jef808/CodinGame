@@ -34,6 +34,8 @@ public:
     void compute_valid_moves() const;
 
     valid_move_range valid_moves() const;
+    template<Player P>
+    constexpr bool has_won() const;
     bool is_won() const;
     Player player_to_move() const;
     constexpr int board_score() const;
@@ -93,5 +95,12 @@ constexpr int Game::board_score() const {
 constexpr int Game::material_imbalance() const {
     return st->mat_imba;
 }
-
+template<Player P>
+constexpr bool Game::has_won() const {
+    for (int x = 0; x < width; ++x) {
+        if (cell_at(x, relative_row(P, 7)) == cell_of(P))
+            return true;
+    }
+    return false;
+}
 #endif

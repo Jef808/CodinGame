@@ -59,6 +59,19 @@
     {
         make_root();
 
+        //NOTE: Say I just output a move so that I will win on the next turn.
+        // Then main calls best_move again and the root_moves are completely reset.
+        // So without any move ordering scheme, the search will just pick a random
+        // move first (rn they show up in lexicographic order so bottom-left corner first)
+        //
+        // But after applying that random action, the eval function will find the pawn that's
+        // one row off the end of the board and return "WIN IN ONE"! So then I will classify
+        // that action as the best one and only *sometimes* be lucky enough that the actual
+        // winning action gets picked.
+        //
+        // TODO: Keep the best line in memory throughout calls to best_move, or find a way
+        // to overwrite that random "winning" action if I find another one that wins faster
+
         Stack stack[max_depth];
         Stack* ss = &stack[0];
         ss->depth = 0;
@@ -72,14 +85,16 @@
 
         for (int depth = 0; depth < s_depth; ++depth) {
 
-            //int best_score = simple_eval_minimax(s_depth, ss);
-            int best_score = eval_minimax(alpha, beta, s_depth, s_width, ss);
+            int best_score = simple_eval_minimax(s_depth, ss);
+            //int best_score = eval_minimax(alpha, beta, s_depth, s_width, ss);
 
             std::cerr << "depth " << depth
                 << " score: " << best_score
                 << std::endl;
 
             std::stable_sort(root_moves.begin(), root_moves.end());
+
+            assert(root_moves[0].value == best_score);
 
         }
 
@@ -91,11 +106,12 @@
         const bool at_root = ss->depth == 0;
         ++n_evals;
 
-        if (game.is_won())
-        {
-            if (at_root)
-                return 32000;
-            return -32000 + ss->depth;
+        bool won_game = game.player_to_move() == Player::White
+            ? game.has_won<Player::Black>()
+            : game.has_won<Player::White>();
+
+        if (won_game) {
+            return at_root ? 32000 : -32000;
         }
 
         std::array<Move, max_n_moves> moves;
@@ -121,35 +137,41 @@
 
             game.apply(*it, st);
 
-            int score = s_depth == 0
-                ? -Eval::evaluate(game)
-                : -simple_eval_minimax(s_depth - 1, ss + 1);
+            int score = best_score;
 
-            if (score == 32000) {
-                score -= ss->depth;
-            } else if (score == -32000) {
-                score += ss->depth;
+            if (s_depth == 0) {
+
+                score = -Eval::evaluate(game);
+
+                if (score >= 32000 - max_depth)
+                    score -= ss->depth;
+
+                else if (score <= -32000 + max_depth)
+                    score += ss->depth;
+            }
+            else {
+                score = -simple_eval_minimax(s_depth - 1, ss + 1);
             }
 
             game.undo(*it);
 
             assert( -32001 < score  && score < 32001 );
 
-            if (at_root || ss->move_count == 1) {
-                ExtMove& rm = *std::find(root_moves.begin(),
-                                         root_moves.end(), *it);
-                rm.value = best_score;
-            }
-
             // Update the search results if we just found a new best move
             // or if this is the first move checked
             if (score > best_score) {
                 best_score = score;
                 best_move = *it;
+
+                if (at_root) {
+                    ExtMove& rm = *std::find(root_moves.begin(),
+                                             root_moves.end(), *it);
+                    rm.value = best_score;
+                }
             }
         }
 
-        return best_score;
+        return best_score - ss->depth;
     }
 
     int Agent::eval_minimax(int alpha, int beta, int s_depth, int s_width, Stack* ss)
