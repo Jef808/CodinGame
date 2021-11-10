@@ -3,28 +3,61 @@
 #include <iostream>
 #include <sstream>
 
+#include "types.h"
 #include "breakthrough.h"
 
-StateInfo root_state;
-int n_legal_moves;
-std::vector<Move> m_valid_moves;
-std::vector<Square> square_buf;
-std::string m_buf;
-std::string view_buf;
-std::string ssquare_buf;
-std::string smove_buf;
-Square offsets[2][3] {
+namespace {
+
+    /**
+     * Pawn-Square Table to give base value to
+     * pawns on the grid.
+     * More value for pawns having wider scope.
+     *
+     * NOTE: call PawnTable[row][col]
+     * TODO: Store that in breakthrough.cpp and keep the value
+     * contributed by this table as we apply/undo moves
+     */
+    constexpr int pawn_square[height][width] = {
+        { -1,  0,  0, -1, -1,  0,  0, -1 },  // rank 0
+        {  2,  4,  5,  7,  7,  5,  4,  2 },
+        {  4,  8, 10, 15, 15, 10,  8,  4 },
+        {  6, 10, 15, 20, 20, 15, 10,  6 },
+        {  7, 12, 20, 25, 25, 20, 12,  7 },
+        { 10, 15, 25, 30, 30, 25, 15, 10 },
+        { 45, 50, 50, 50, 50, 50, 50, 45 },
+        {  0,  0,  0,  0,  0,  0,  0,  0 },  // rank 8
+    };
+
+    constexpr int pawn_value { 100 };
+    
+    StateInfo root_state {
+        0,           // ply
+        0,           // board_score
+        0,           // mat_imba
+        false,       // is_capture
+        nullptr      // prev
+    };
+    int n_legal_moves;
+    std::vector<Move> m_valid_moves;
+    std::vector<Square> square_buf;
+    std::string m_buf;
+    std::string view_buf;
+    std::string ssquare_buf;
+    std::string smove_buf;
+    Square offsets[2][3] {
     { { -1, 1 }, { 0, 1 }, { 1, 1 } }, // Moves for white
     { { -1, -1 }, { 0, -1 }, { 1, -1 } } // Moves for black
 };
-constexpr int white_row = 0;
-constexpr int black_row = 7;
 
+}  // namespace
+    
 std::ostream& operator<<(std::ostream& out, const Cell cell);
 std::ostream& operator<<(std::ostream& out, const Square square);
 std::ostream& operator<<(std::ostream& out, const Move move);
 
-Game::Game() {
+Game::Game()
+    : st{&root_state}
+{
     m_grid.fill(Cell::Empty);
     for (int y = 0; y < height + 2; ++y) {
         m_grid[y * (width + 2)] = m_grid[(y + 1) * (width + 2) - 1] = Cell::Boundary;
@@ -32,14 +65,16 @@ Game::Game() {
     for (int x = 1; x < width + 1; ++x) {
         m_grid[x] = m_grid[x + (height + 2 - 1) * (width + 2)] = Cell::Boundary;
     }
-    for (int y : { white_row, white_row + 1 }) {
+    for (int y : { 0, 1 }) {
         for (int x = 0; x < 8; ++x) {
             cell_at(x, y) = Cell::White;
+            st->board_score += pawn_square[y][x]; 
         }
     }
-    for (int y : { black_row, black_row - 1 }) {
+    for (int y : { 6, 7 }) {
         for (int x = 0; x < 8; ++x) {
             cell_at(x, y) = Cell::Black;
+            st->board_score += relative_score(Player::Black, pawn_square[relative_row(Player::Black, y)][x]);
         }
     }
     n_turns = 0;
@@ -51,10 +86,7 @@ void Game::init(std::istream& is) {
     m_buf.clear();
 
     std::getline(is, m_buf);
-    if (m_buf[0] == 'N') {
-        m_player = Player::White;
-    } else {
-        m_player = Player::Black;
+    if (m_buf[0] != 'N') {
         Move move = get_move(m_buf);
         apply(move, root_state);
     }
@@ -144,7 +176,7 @@ std::string_view Game::view() const
 {
     std::ostringstream out;
 
-    out << "       "
+    out << "\n       "
         << (m_player_to_move == Player::White ? "WHITE " : "BLACK ")
         << "to play\n";
 
@@ -169,38 +201,50 @@ std::string_view Game::view() const
 }
 
 /// Return true if game is won from the point of view of the last player that moved
-bool Game::is_won()
+bool Game::is_won() const
 {
-    bool turn_white = player_to_move() == Player::White;
-    auto* it = turn_white ? &cell_at(0, 0) : &cell_at(0, height - 1);
-    auto* end = turn_white ? &cell_at(7, 0) : &cell_at(7, height - 1);
-    for (; it != end; ++it) {
-        if (*it == cell_of(!player_to_move())) {
+    for (int x = 0; x < width; ++x) {
+        if (cell_at(x, relative_row(player_to_move(), 0)) == cell_of(!player_to_move()))
             return true;
-        }
     }
     return false;
 }
 
-void Game::apply(const Move& move, StateInfo& st)
+void Game::apply(const Move& move, StateInfo& _st)
 {
     assert(!(move == Move_None));
     assert(cell_at(move.from.col, move.from.row) == cell_of(player_to_move()));
 
     Cell cell = Cell::Empty;
+    Player p = m_player_to_move;
 
-    st.is_capture = is_capture(move);
+    // Record basic data into the new StateInfo object
+    _st.ply = st->ply + 1;
+    _st.is_capture = is_capture(move);
+    _st.board_score = st->board_score;
+    _st.mat_imba = st->mat_imba;
+    
+    if (_st.is_capture) {
+        // add score if opponent is black, remove it if white
+        _st.board_score -= relative_score(!p, pawn_square[relative_row(!p, move.to.row)][move.to.col]);
+        _st.mat_imba -= relative_score(!p, pawn_value);
+    }
 
+    // Make the move on the grid
     std::swap(cell, cell_at(move.from.col, move.from.row));
     std::swap(cell, cell_at(move.to.col, move.to.row));
 
     assert(cell_at(move.to.col, move.to.row) == cell_of(player_to_move()));
 
-    st.move = move;
+    // Update the incremental board score
+    _st.board_score += relative_score(p, pawn_square[relative_row(p, move.to.row)][move.to.col])
+        - relative_score(p, pawn_square[relative_row(p, move.from.row)][move.from.col]);
 
-    st.prev = this->st;
-    this->st = &st;
+    // Set the passed StateInfo object as the new one
+    _st.prev = this->st;
+    this->st = &_st;
 
+    // Increment turn and switch side to move
     ++n_turns;
     m_player_to_move = !m_player_to_move;
 }
@@ -209,7 +253,6 @@ void Game::undo(const Move& move)
 {
     assert(!(move == Move_None));
     assert(cell_at(move.to.col, move.to.row) == cell_of(!player_to_move()));
-    assert(this->st->move == move);
 
     /// If the move we are undoing was a capture, the color was the current player's
     Cell cell = st->is_capture ? cell_of(player_to_move()) : Cell::Empty;

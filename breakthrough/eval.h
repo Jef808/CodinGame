@@ -11,7 +11,7 @@ namespace Eval {
 
 int evaluate(const Game& game);
 
-std::string test();
+std::pair<int, std::string> trace(const Game& game);
 
 } // namespace Eval
 

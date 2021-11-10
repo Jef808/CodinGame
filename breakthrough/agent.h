@@ -45,7 +45,7 @@ class Agent {
 public:
     Agent(Game&);
     /** Pick the the move maximizing the result of the score_move() method */
-    Move simple_best_move();
+    Move simple_best_move(bool debug_eval = false);
 
     /** Same as simple_best_move but run minimax at depth `search_depth' to pick the best move */
     Move best_move(int search_depth, int search_width = max_n_moves);

@@ -7,5 +7,6 @@
 
 int main()
 {
-    std::cerr << Eval::test() << std::endl;
+    //std::cerr << Eval::test() << std::endl;
+    return 0;
 }

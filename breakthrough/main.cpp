@@ -10,7 +10,8 @@
 
 int main(int argc, char* argv[])
 {
-    constexpr bool debug_move_gen = true;
+    constexpr bool debug_move_gen = false;
+    constexpr bool debug_eval = false;
 
     std::string buf;
 
@@ -18,7 +19,7 @@ int main(int argc, char* argv[])
     game.init(std::cin);
 
     Agent agent(game);
-    int s_depth = 0;
+    int s_depth = 3;
     int s_width = max_n_moves;
 
     StateInfo states[max_depth];
@@ -27,8 +28,8 @@ int main(int argc, char* argv[])
 
     while (!done) {
 
-        Move move = agent.simple_best_move();
-        //Move move = agent.best_move(s_depth, s_width, debug_best_move);
+        Move move = agent.simple_best_move(debug_eval);
+        //Move move = agent.best_move(s_depth, s_width);
 
         std::cout << Game::view_move(move) << std::endl;
 
