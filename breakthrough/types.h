@@ -7,7 +7,7 @@ constexpr int width = 8;
 constexpr int height = 8;
 constexpr int Nsquares = 64;
 constexpr int max_n_moves = 48;
-constexpr int max_depth = 128;
+constexpr int max_depth = 256;
 
 enum class Player {
     White,

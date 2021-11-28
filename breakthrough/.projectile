@@ -1,0 +1,3 @@
+(setq projectile-project-name "breakthrough")
+(setq projectile-project-compilation-dir "build")
+(setq projectile-project-build-cmd "make -k all")

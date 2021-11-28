@@ -184,7 +184,7 @@ inline void Solver::visit(const Move& m)
 const std::array<Solver::Move, 9>& Solver::push_next_moves(int hole_ndx)
 {
     auto indices = board.candidates(Indexer::toRow(hole_ndx), Indexer::toCol(hole_ndx));
-    auto& moves = valid_moves.emplace_back(std::array<Solver::Move, 9> {}); //{std::pair<int, int>{0, 0}});
+    auto& moves = valid_moves.emplace_back(std::array<Solver::Move, 9> {});
     std::transform(indices.begin(), indices.end(), moves.begin(), [h = hole_ndx](const auto n) {
         return Move { h, n };
     });
@@ -253,7 +253,7 @@ void Sudoku::output(std::ostream& _out) const
             _out << d
                  << "\e[0m";
         }
-        _out << '\n';
+        _out << std::endl;
     }
     _out << std::endl;
 }
@@ -281,7 +281,6 @@ int main(int argc, const char* argv[])
     auto [final_board, winner] = solver.final_board();
 
     if (winner) {
-        std::cout << "Found winner!" << std::endl;
         final_board.output(std::cout);
     } else {
         std::cout << "No solution" << std::endl;
