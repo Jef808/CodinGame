@@ -1,3 +1,5 @@
+//#define DEBUG
+
 #include "escape_cat.h"
 #include "utilities.h"
 #include "agent.h"
@@ -8,56 +10,39 @@
 
 using namespace escape_cat;
 
+int norm2(const PointI_Euc& p) { return p.x*p.x + p.y*p.y; }
 
-std::string pretty(const State& state) {
-    Point mouse = state.mouse.point_position();
-    Point cat = state.cat.get_point_position();
+void pretty(const State& state, std::string buf) {
+    auto mouse_pos = PointI_Euc{ rescale(state.mouse.euclidean_coordinates(), 0.1) };
+    auto cat_pos = PointI_Euc{ rescale(state.cat.euclidean_coords(), 0.1) };
 
-    rescale(mouse, 0.1);
-    rescale(cat, 0.1);
+    // translate because origin coordinate systems is centered at
+    // the center of the circle
+    mouse_pos.x += 50; mouse_pos.y += 50;
+    cat_pos.x += 50; cat_pos.y += 50;
 
-    PointI mouse_ = mouse;
-    PointI cat_ = cat;
+    std::stringstream ss{ buf };
 
-    mouse_.x += 50;
-    cat_.x += 50;
+    PointI_Euc counter{ 0, 0 };
 
-    std::stringstream ss;
-
-    for (int x = 0; x < 100; ++x) {
-        for (int y = 0; y < 55; ++y) {
-            if (mouse_.x == x && mouse_.y == y) {
+    for (; counter.x < 100; ++counter.x) {
+        for (; counter.y < 100; ++counter.y) {
+            if (mouse_pos == counter)
                 ss << "M";
+            else if (cat_pos == counter) {
+                ss << "C";
             }
-            else if (cat.x == x && cat.y == y) {
-                    ss << "C";
+            else if (norm2(counter) < 50*50) {
+                ss << ".";
+            } else if (norm2(counter) < 52*52) {
+                ss << "o";
             }
-            else {
-                int norm2 = x*x + y*y;
-                if (norm2 < 2500) {
-                        ss << ".";
-                }
-                else if (norm2 < 2504){
-                        ss << "o";
-                }
-                else
-                    ss << ".";
-            }
+            else
+                ss << " ";
         }
         ss << '\n';
     }
-
-    return ss.str();
 }
-
-/**
- * The way we approach the problem, each action consists of specifying a target point
- * on the circle boundary.
- *
- * We write down what quantity should be minimized/maximized, what constraints should
- * be statisfied, and move on from there.
- */
-
 
 
 int main() {
@@ -66,41 +51,38 @@ int main() {
     using std::cerr;
     using std::endl;
 
+    // For debuging
+    std::string output_buffer;
+    std::string debug;
+
     Game game;
     game.init(cin);
     cin.ignore();
 
     Agent agent;
 
-    // For debuging
-    std::string debug;
-    Cat* debug_cat = nullptr;
-    Mouse* debug_mouse = nullptr;
+    Cat debug_cat = game.state().cat;
+    Mouse debug_mouse = game.state().mouse;
 
     while (true) {
         game.update_state(cin);
 
-        {
-            if (*debug_cat != game.state().cat)
-               cerr << "Handling of action on Cat part of theh state" << endl;
-            if (*debug_mouse != game.state().mouse)
-                cerr << "Problem with the cat in our simulation" << endl;
-        }
+#ifdef DEBUG
+        if (not (debug_cat == game.state().cat))
+            cerr << "Handling of action on Cat part of the state" << endl;
+        if (not (debug_mouse == game.state().mouse))
+            cerr << "Problem with the cat in our simulation" << endl;
+#endif
+        Point_Euc target = agent.choose_move(game, debug);
+        agent.format_choice_for_submission(target, debug, output_buffer);
 
+        cout << output_buffer << std::endl;
+        //cerr << pretty(game.state()) << endl;
 
-        Point target = agent.choose_move(game, debug);
-        agent.output_choice(cout, target, game.state());
-
-        cerr << "Agent chose target " << target.x << ' ' << target.y << ' ' << debug << endl;
-
-//        cerr << pretty(game.state()) << endl;
-
-        cerr << "Collected the drawing data" << endl;
-
-        cerr << "Before game.step" << endl;
-        State next_state = game.step(target);
-        debug_cat = &next_state.cat;
-        debug_mouse = &next_state.mouse;
+        //cerr << "Before game.step" << endl;
+        // State next_state = game.step(target);
+        // debug_cat = next_state.cat;
+        // debug_mouse = next_state.mouse;
         // cerr << "New cat pos: " << new_cat.x << ' ' << new_cat.y
         //      << "\nNew mouse pos: " << new_mouse.x << ' ' << new_cat.y << endl;
     }

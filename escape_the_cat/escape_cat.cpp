@@ -13,11 +13,7 @@
 
 namespace escape_cat {
 
-    namespace {
-
-constexpr double degree_2_radian(long degree) {
-    return static_cast<double>(degree) * M_PI / 180.0;
-};
+namespace {
 
 void normalize_angle(double& angle, double min=-M_PI, double max=M_PI) {
     if (angle < min)
@@ -31,49 +27,29 @@ void normalize_angle(double& angle, double min=-M_PI, double max=M_PI) {
     assert(angle < max + EPSILON
            && "Cat angle is above max after normalizing");
 }
-    } // unnamed namespace
+
+} // unnamed namespace
 
 
+void Cat::chase_mouse() noexcept {
 
-void Cat::set_position(Point cat) {
+}
+
+void Cat::set_position(Point_Euc cat) {
     m_angle = std::atan2(cat.x, cat.y);
 }
 
-
-[[nodiscard]] Point Cat::get_point_position() const {
+[[nodiscard]] Point_Euc Cat::euclidean_coords() const {
     return { RADIUS*std::cos(m_angle), RADIUS*std::sin(m_angle) };
 }
 
-void Cat::set_speed(NPixel speed) noexcept {
-    m_speed = static_cast<double>(speed) / RADIUS;
-}
-    [[nodiscard]] Radian Cat::speed() const noexcept { return m_speed; }
-
-    [[nodiscard]] Radian Cat::angle() const noexcept { return m_angle; }
-
-    [[nodiscard]] Radian Cat::compute_reach(int n_turns) const noexcept {
-        return m_speed * n_turns;
-    }
-
-    void Mouse::set_position(Point mouse) {
+    void Mouse::set_position(Point_Euc mouse) {
         m_angle = std::atan2(mouse.x, mouse.y);
         m_radius = std::sqrt(mouse.x * mouse.x + mouse.y * mouse.y);
     }
 
-    [[nodiscard]] Point Mouse::point_position() const {
+    [[nodiscard]] Point_Euc Mouse::euclidean_coordinates() const {
         return { m_radius*std::cos(m_angle), m_radius*std::sin(m_angle) };
-    }
-
-    [[nodiscard]] double Mouse::radius() const noexcept {
-        return m_radius;
-    }
-
-    [[nodiscard]] Radian Mouse::angle() const noexcept {
-        return m_angle;
-    }
-
-    [[nodiscard]] double Mouse::speed() const noexcept {
-        return m_speed;
     }
 
     CircleArc::CircleArc(NPixel radius, Radian r1, Radian r2)
@@ -113,12 +89,6 @@ void Cat::set_speed(NPixel speed) noexcept {
         m_r2 = r2;
     }
 
-
-    void Game::init(std::istream& _in) {
-        int speed; _in >> speed;
-        m_state.cat.set_speed(speed);
-    }
-
     void Game::update_state(std::istream& _in) {
         double m_x, m_y, c_x, c_y;
         _in >> m_x >> m_y >> c_x >> c_y;
@@ -152,43 +122,6 @@ void Cat::set_speed(NPixel speed) noexcept {
         return status;
     }
 
-    // FIXME
-    State Game::step(const Point& action) {
-
-        State result = m_state;
-
-        Point current_pos = m_state.mouse.point_position();
-        Point next_direction = action - current_pos;
-        double norm = std::sqrt(radius2(next_direction));
-        Point new_mouse_position = rescale(next_direction, 10.0 / norm);
-
-        result.mouse.set_position(new_mouse_position);
-
-        Radian new_mouse_angle = std::atan2(new_mouse_position.x, new_mouse_position.y);
-        Radian cat_angle = m_state.cat.angle();
-        Point new_cat_target = rescale(new_mouse_position, RADIUS / 10.0);
-
-        Radian angle_diff = new_mouse_angle - cat_angle;
-        if (std::abs(angle_diff) < M_PI) { // Meaning we are on the shorted side of the circle
-            Radian new_cat_angle = angle_diff > 0.0 ? cat_angle + m_state.cat.speed() : cat_angle - m_state.cat.speed();
-            result.cat.set_position({ RADIUS*std::cos(new_cat_angle), RADIUS*std::sin(new_cat_angle) });
-        }
-
-        return result;
-    }
-
-
-bool Point::operator!=(const Point& other) {
-    std::cerr << "Warning: Implementation of comparison between double-valued points sloppily compares the result of rounding down" << std::endl;
-    PointI rndd_p = *this;
-    Point other_ = other;
-    PointI rndd_otherp = other_;
-    return rndd_p != rndd_otherp;
-}
-
-bool operator==(const Point& point, const Point& otherPoint) {
-    return std::floor(point.x) == std::floor(otherPoint.x) && std::floor(point.y) == std::floor(otherPoint.y);
-}
 
 bool operator==(const Cat& cat, const Cat& otherCat) {
     return
@@ -196,8 +129,7 @@ bool operator==(const Cat& cat, const Cat& otherCat) {
         + std::abs(cat.speed() - otherCat.speed()) < 2 * EPSILON;
 }
 bool operator==(const Mouse& mouse, const Mouse& otherMouse) {
-    return std::abs(mouse.angle() - otherMouse.angle())
-        + (distance2(mouse.point_position(), otherMouse.point_position())) < 2 * EPSILON;
+    return mouse.euclidean_coordinates() == otherMouse.euclidean_coordinates();
 }
 
 
