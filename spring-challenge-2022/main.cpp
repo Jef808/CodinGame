@@ -1,136 +1,19 @@
-#include <array>
 #include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <iostream>
 #include <string_view>
-#include <type_traits>
 #include <vector>
 
-template<typename E,
-         typename U=std::conditional_t<
-             std::is_enum_v<E>,
-             std::underlying_type_t<E>,
-             std::conditional_t<
-                 std::is_integral_v<E>,
-                 E,
-                 void>
-             >
-         >
-constexpr auto to_integral(E e) -> U { return static_cast< U >(e); }
+#include "types.h"
 
-constexpr int WIDTH = 0x44DF;
-constexpr int HEIGHT = 0x2329;
-constexpr int MAX_MOVE = 800;
-constexpr int MAX_TURNS = 220;
+namespace spring {
 
-inline constexpr auto encode(int x, int y) -> uint32_t {
-    return ((unsigned)(y & 0xFFFF) << 16) | (x & 0xFFFF);
-}
-enum class Offset : uint32_t { NONE = encode(0, 0),
-                               EAST = encode(1, 0),  WEST = encode(-1, 0),
-                               SOUTH = encode(0, 1), NORTH = encode(0, -1),
-                               SOUTH_EAST = SOUTH | EAST, SOUTH_WEST = SOUTH | WEST, NORTH_EAST = NORTH | EAST, NORTH_WEST = NORTH | WEST
-};
-enum class Corner : uint32_t { NORTH_WEST = encode(0, 0),
-                               NORTH_EAST = encode(WIDTH-1, 0),
-                               SOUTH_EAST = encode(WIDTH-1, HEIGHT-1),
-                               SOUTH_WEST = encode(0, HEIGHT-1)
-};
-inline auto constexpr get_x(Offset off) -> int { return static_cast<int16_t>(to_integral(off) & 0xFFFF); }
-inline auto constexpr get_y(Offset off) -> int { return static_cast<int16_t>(to_integral(off) >> 16); }
-inline auto constexpr Vertical(Offset off) -> Offset { return Offset(encode(0, get_y(off))); }
-inline auto constexpr Horizontal(Offset off) -> Offset { return Offset(encode(get_x(off), 0)); }
-
-struct Direction {
-    double angle{ 0.0 };
-
-    constexpr Direction() = default;
-
-    explicit constexpr Direction(double angle_, double normalization=-M_PI)
-        : angle { normalized(angle_, normalization) }
-    {}
-
-    /** Normalize the angle between (theta, theta + 2*PI] */
-    static constexpr auto normalized(double angle_, const double theta) -> double {
-        return angle_ + (angle_ < theta + 0.000001 ? -1 : 1) * std::floor(angle_ / (theta + 2*M_PI));
-    }
-
-    static constexpr auto offset(const Direction& dir) -> Offset {
-        constexpr std::array<Offset, 8> offsets_thresholds { Offset::WEST, Offset::SOUTH_WEST, Offset::SOUTH, Offset::SOUTH_EAST, Offset::EAST, Offset::NORTH_EAST, Offset::NORTH, Offset::NORTH_WEST };
-        const double a = normalized(dir.angle, -M_PI);
-        for (int i = 0; i < 8; ++i) {
-            if (a < -M_PI + (2*i + 1) * M_PI / 8) {
-                return offsets_thresholds[i];
-            }
-        }
-        return Offset::WEST;
-    }
-};
-
-struct Point
+auto
+operator<<(std::ostream& _out, const Point& p) -> std::ostream&
 {
-    int x;
-    int y;
-
-    constexpr Point() : x{ WIDTH }, y{ HEIGHT - 1 }
-    {}
-    constexpr Point(int x_, int y_) : x{ x_ }, y{ y_ }
-    {}
-    explicit constexpr Point(Offset off) : x { get_x(off) }, y { get_y(off) }
-    {}
-
-    constexpr auto operator!=(const Point& other) const noexcept -> bool { return this->x != other.x || this->y != other.y; }
-    constexpr auto operator==(const Point& other) const noexcept -> bool { return this->x == other.x && this->y == other.y; }
-
-    [[nodiscard]] inline auto constexpr direction_of(const Point& p, double normalization=-M_PI) const -> Direction {
-        auto dx = static_cast<double>(p.x - this->x);
-        auto dy = static_cast<double>(p.y - this->y);
-        return Direction{ std::atan2(dy, dx) };
-    }
-    [[nodiscard]] constexpr auto encoded(const Point& p) const noexcept -> uint32_t { return encode(x, y); }
-};
-
-inline auto constexpr operator+(const Point& a, const Point& b) -> Point { return { a.x + b.x, a.y + b.y }; }
-inline auto constexpr operator+(const Point& p, Offset off) -> Point { return p + Point{off}; }
-
-inline auto constexpr directed_floor(double x_, double y_, Direction dir) -> Point {
-    const auto off = Direction::offset(dir);
-    Point p{};
-
-    if (Horizontal(off) == Offset::EAST) { p.x = std::floor(x_); }
-    else { p.x = std::ceil(x_); }
-
-    if (Vertical(off) == Offset::SOUTH) { p.y = std::floor(y_); }
-    else { p.y = std::ceil(y_); }
-
-    return p;
+    return _out << p.x << ' ' << p.y;
 }
-
-inline auto constexpr dot(const Point& a, const Point& b) -> double { return a.x * b.x + a.y * b.y; }
-inline auto constexpr distance2(const Point& a, const Point& b) -> int { return (a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y); }
-inline auto constexpr distance(const Point& a, const Point& b) -> double { return std::sqrt(distance2(a, b)); }
-auto operator<<(std::ostream& _out, const Point& p) -> std::ostream& { return _out << p.x << ' ' << p.y; }
-
-struct Vector {
-    Point p;
-    Direction dir;
-    double norm;
-};
-inline auto constexpr operator*(const Vector& v, double s) -> Vector {
-    return { v.p, v.dir, v.norm * s };
-}
-inline auto constexpr operator-(const Point& a, const Point& b) -> Vector {
-    return { b, b.direction_of(a), distance(a, b) };
-}
-inline constexpr auto Flow(const Vector& v) -> Vector {
-    double x = v.p.x + v.norm * std::cos(v.dir.angle);
-    double y = v.p.y + v.norm * std::sin(v.dir.angle);
-    return { directed_floor(x, y, v.dir), v.dir, v.norm };
-}
-
-constexpr auto Point_None = Point{};
-constexpr inline auto Vector_Zero(const Point& p) -> Vector { return { p, Direction{}, 0.0 }; }
 
 
 struct Hero
@@ -173,11 +56,12 @@ struct Action
     enum class Type
     {
         WAIT,
-        MOVE
+        MOVE,
+        SPELL
     };
-    Type type { Type::WAIT };
-    Point dest { };
-    std::string_view msg { "" };
+    Type type{ Type::WAIT };
+    Point dest{};
+    std::string_view msg{ "" };
 
     Action() = default;
 
@@ -188,7 +72,7 @@ struct Action
     {}
 
     explicit Action(std::string_view msg_)
-        : msg{msg_}
+            : msg{ msg_ }
     {}
 };
 
@@ -274,7 +158,6 @@ private:
     int m_n_turns;
 };
 
-
 inline auto
 n_turns_to_kill(const Monster& monster) noexcept -> int
 {
@@ -293,38 +176,45 @@ distance_needed_to_kill(const Monster& monster, const int n_hero = 1) noexcept -
  * FIXME: I tweaked the values in operator() until I got regions between 0 and 3
  * but I don't know where the bug is (this isn't what it should be...)
  */
-struct
-get_region {
+struct get_region
+{
     const Point corner;
 
-    get_region(const Point& base) : corner{ base.x < WIDTH / 10.0 ? Point{ 0, 0 } : Point{ WIDTH-1, HEIGHT-1 } }
+    get_region(const Point& base)
+            : corner{ base.x < WIDTH / 10.0 ? Point{ 0, 0 } : Point{ WIDTH - 1, HEIGHT - 1 } }
     {
         std::cerr << "Init region getter with corner = " << corner << std::endl;
     }
 
-    auto operator()(const Point& p) -> int {
+    auto operator()(const Point& p) -> int
+    {
         Direction dir = (p - corner).dir;
-        double a = corner.x == 0 ? 6.0 * dir.angle * M_1_PI : 6.0 * dir.angle * M_1_PI + 6;
-        std::cerr << "Threat in region " << a << std::endl;
-        return std::floor(a);
+        double a = Direction::normalized(dir.angle, corner.x == 0 ? -M_PI : 0.0);
+        //double corner_angle = corner.x == 0 ? a + (0.5 * M_PI) : a - (0.5 * M_PI);  // Rotate by -90 or +90 degrees to land in [0, pi/2]
+        //double a = corner.x == 0 ? 6.0 * dir.angle * M_1_PI : 6.0 * dir.angle * M_1_PI + 6;
+        double corner_fraction = 6.0 * M_1_PI * a + (corner.x == 0 ? 3 : -3);
+        std::cerr << "Threat in region " << corner_fraction << std::endl;
+        return std::floor(corner_fraction);
     }
 };
 
 class Agent
 {
-    struct ExtMonster {
+    struct ExtMonster
+    {
         int region;
         int base_distance2;
         Monster monster;
 
         ExtMonster(int reg_, int bd2_, const Monster& m)
-            : region{ reg_ }
-            , base_distance2{ bd2_ }
-            , monster{ m }
+                : region{ reg_ }
+                , base_distance2{ bd2_ }
+                , monster{ m }
         {}
     };
 
-    struct ExtHero {
+    struct ExtHero
+    {
         int region;
         Hero hero;
         std::vector<ExtMonster> monsters;
@@ -347,8 +237,7 @@ public:
         for (int i = 0; i < 3; ++i) {
             if (m_our_heros[i].monsters.empty()) {
                 actions.emplace_back("No threat in my region");
-            }
-            else {
+            } else {
                 const Monster& monster = m_our_heros[i].monsters.front().monster;
                 actions.emplace_back(target_monster(monster), "Targetting most dangerous monster");
             }
@@ -363,8 +252,9 @@ private:
 
     get_region our_regions{ m_game.us().base };
 
-    void init() {
-        for (int i=0; i<3; ++i) {
+    void init()
+    {
+        for (int i = 0; i < 3; ++i) {
             m_our_heros[i] = ExtHero{ i, m_game.us().heros[i], {} };
         }
     }
@@ -382,10 +272,11 @@ private:
                      [&player](const Monster& monster) { return monster.threat_for == player; });
     }
 
-    void assign_monsters() {
+    void assign_monsters()
+    {
 
         // Clear earlier assignments
-        for (int i=0; i<3; ++i) {
+        for (int i = 0; i < 3; ++i) {
             m_our_heros[i].monsters.clear();
         }
 
@@ -397,17 +288,20 @@ private:
         }
 
         // Sort each hero's monsters by distance to base
-        for (int i=0; i<3; ++i) {
-            std::sort(m_our_heros[i].monsters.begin(), m_our_heros[i].monsters.end(), [](const auto& em1, const auto& em2) {
-                return em1.base_distance2 < em2.base_distance2;
-            });
+        for (int i = 0; i < 3; ++i) {
+            std::sort(
+              m_our_heros[i].monsters.begin(),
+              m_our_heros[i].monsters.end(),
+              [](const auto& em1, const auto& em2) { return em1.base_distance2 < em2.base_distance2; });
         }
     }
 
-    auto target_monster(const Monster& monster) -> Point {
-        return monster.pos + monster.vel;
-    }
+    auto target_monster(const Monster& monster) -> Point { return monster.pos + monster.vel; }
 };
+
+} // namespace spring
+
+using namespace spring;
 
 auto
 operator<<(std::ostream& _out, const Action& action) -> std::ostream&
