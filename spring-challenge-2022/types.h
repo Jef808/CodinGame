@@ -14,6 +14,9 @@ constexpr int WIDTH = 0x44DF;
 constexpr int HEIGHT = 0x2329;
 constexpr int MAX_MOVE = 800;
 constexpr int MAX_TURNS = 220;
+constexpr double MM_PI_12 = 0.26179938779914940782944655;
+constexpr double MM_PI_4 = 0.78539816339744827899949087;
+constexpr double MM_5PI_12 = 1.30899693899574720568068642;
 
 namespace details {
 
@@ -74,11 +77,13 @@ inline auto constexpr Horizontal(Offset off) -> Offset
 struct Direction
 {
     double angle{ 0.0 };
+    double normalizer{ -M_PIf64 };
 
     constexpr Direction() = default;
 
-    explicit constexpr Direction(double angle_)
+    explicit constexpr Direction(double angle_, double normalizer_ = -M_PIf64)
             : angle{ angle_ }
+            , normalizer{ normalizer_ }
     {}
 
     /** Normalize the angle between (theta, theta + 2*PI] */
@@ -164,7 +169,11 @@ operator+(const Point& p, Offset off) -> Point
 {
     return p + Point{ off };
 }
-
+inline auto constexpr
+operator-(const Point& p) -> Point
+{
+    return Point{ -p.x, -p.y };
+}
 inline auto constexpr directed_floor(double x_, double y_, Direction dir) -> Point
 {
     const auto off = Direction::offset(dir);

@@ -59,7 +59,14 @@ struct Action
         MOVE,
         SPELL
     };
+    enum class SpellType
+    {
+        NONE,
+        WIND
+    };
+
     Type type{ Type::WAIT };
+    SpellType spell_type{ SpellType::NONE };
     Point dest{};
     std::string_view msg{ "" };
 
@@ -67,6 +74,13 @@ struct Action
 
     Action(Point dest_, std::string_view msg_ = "")
             : type{ Type::MOVE }
+            , dest{ dest_ }
+            , msg{ msg_ }
+    {}
+
+    Action(Point dest_, SpellType spell_type_, std::string_view msg_ = "")
+            : type{ Type::SPELL }
+            , spell_type{ spell_type_ }
             , dest{ dest_ }
             , msg{ msg_ }
     {}
@@ -168,13 +182,11 @@ distance_needed_to_kill(const Monster& monster, const int n_hero = 1) noexcept -
 {
     return n_turns_to_kill(monster) * 400;
 }
+
 /**
  * Split the map into three 'triangular' regions based at our base:
  * 0 for upper, 1 for middle and 2 for bottom.
  * Initially, each corresponding hero is in charge of its own region.
- *
- * FIXME: I tweaked the values in operator() until I got regions between 0 and 3
- * but I don't know where the bug is (this isn't what it should be...)
  */
 struct get_region
 {
@@ -190,8 +202,6 @@ struct get_region
     {
         Direction dir = (p - corner).dir;
         double a = Direction::normalized(dir.angle, corner.x == 0 ? -M_PI : 0.0);
-        //double corner_angle = corner.x == 0 ? a + (0.5 * M_PI) : a - (0.5 * M_PI);  // Rotate by -90 or +90 degrees to land in [0, pi/2]
-        //double a = corner.x == 0 ? 6.0 * dir.angle * M_1_PI : 6.0 * dir.angle * M_1_PI + 6;
         double corner_fraction = 6.0 * M_1_PI * a + (corner.x == 0 ? 3 : -3);
         std::cerr << "Threat in region " << corner_fraction << std::endl;
         return std::floor(corner_fraction);
@@ -239,7 +249,12 @@ public:
                 actions.emplace_back("No threat in my region");
             } else {
                 const Monster& monster = m_our_heros[i].monsters.front().monster;
-                actions.emplace_back(target_monster(monster), "Targetting most dangerous monster");
+                if (distance_needed_to_kill(monster) > distance(m_game.us().base, monster.pos) && distance(m_our_heros[i].hero.pos, monster.pos) < 1280) {
+                    actions.emplace_back(monster.pos + -m_game.us().base, Action::SpellType::WIND, "Pushing back monster");
+                }
+                else {
+                    actions.emplace_back(target_monster(monster), "Targetting most dangerous monster");
+                }
             }
         }
     }
@@ -306,8 +321,11 @@ using namespace spring;
 auto
 operator<<(std::ostream& _out, const Action& action) -> std::ostream&
 {
-    _out << (action.type == Action::Type::WAIT ? "WAIT" : "MOVE");
-    if (action.type == Action::Type::MOVE) {
+    _out << (action.type == Action::Type::WAIT ? "WAIT" : action.type == Action::Type::MOVE ? "MOVE" : "SPELL");
+    if (action.type == Action::Type::SPELL) {
+        _out << ' ' << (action.spell_type == Action::SpellType::WIND ? "WIND" : "N/A");
+    }
+    if (action.type == Action::Type::MOVE || action.type == Action::Type::SPELL) {
         _out << ' ' << action.dest;
     }
     if (action.msg != "") {
