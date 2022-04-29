@@ -11,7 +11,7 @@ target_link_libraries(viewer
   imgui
   glm
   )
-
-target_compile_features(viewer PRIVATE cxx_std_17)
+#target_include_directories(viewer PUBLIC)
+#target_compile_features(viewer PRIVATE cxx_std_17)
 
 list(APPEND escape_cat_TARGETS viewer)
