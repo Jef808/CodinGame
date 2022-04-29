@@ -11,16 +11,17 @@ set(BUILD_SHARED_LIBS OFF)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/bin)
 list(PREPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/../cmake)
 
+set( escapethecat_TARGETS )
+
+function( register_target )
+  list( APPEND escapethecat_TARGETS $1 )
+endfunction()
+
 ###############
 # Executables #
 ###############
-set( mouse-cat-escape_TARGETS
-  main_escape_cat
-  )
-
-foreach ( target ${mouse-cat-escape_TARGETS} )
-  add_executable( ${target} )
-endforeach()
+add_executable(main_escape_cat)
+register_target(main_escape_cat)
 
 ######################################
 # main_escape_cat build instructions #
@@ -35,7 +36,6 @@ target_include_directories(main_escape_cat
   PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}
   )
-
 
 #################
 # Dev utilities #
@@ -56,8 +56,6 @@ add_custom_target(main_bundled
 ###################
 add_subdirectory(imgui)
 
-
-
 set(GCC_OUTPUT_FORMATTING
   "SHELL:-fdiagnostics-color=always"
   "SHELL:-fdiagnostics-show-template-tree"
@@ -65,7 +63,7 @@ set(GCC_OUTPUT_FORMATTING
 
 
 include(CMakePrintHelpers)
-foreach ( target ${escape_cat_TARGETS} )
+foreach ( target ${escapethecat_TARGETS} )
   target_compile_options( ${target} ${GCC_OUTPUT_FORMATTING} )
 
   cmake_print_properties(
