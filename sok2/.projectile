@@ -1,0 +1,2 @@
+(projectile-project-compilation-dir . ~/projects/CodinGame/sok2)
+(projectile-project-configure-cmd . cmake -S sok2 -B sok2/build)
