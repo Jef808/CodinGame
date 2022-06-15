@@ -3,6 +3,7 @@
 
 #include "types.h"
 
+#include <algorithm>
 #include <cmath>
 #include <type_traits>
 
@@ -50,16 +51,26 @@ inline double midpoint(int a, int b) {
 }
 
 /**
- * Return the point opposite to p on the segment [m, M],
- * making sure to leave an odd number of digits between p and
- * the result to not miss a lucky find.
+ * Return the point opposite to p with respect to the
+ * segment [m, M] sitting inside of [0, Max], making
+ * sure to leave an odd integral distance between p and
+ * the result, to avoid missing a lucky equal distance.
+ *
+ * @Param m  The lower bound of the interval
+ * @Param M  The upper bound of the interval
+ * @Param Max  The global width/height of the bounding grid
+ * @Param p  The point to reflect
  */
-inline int opposite(int m, int M, int p) {
-    return m + M - p + ((m + M) & 1) * (1 - 2 * (p & 1));
+inline int opposite(int m, int M, int Max, int p) {
+    return std::clamp(m + M - p + ((m + M) & 1) * (1 - 2 * (p & 1)), 0, Max);
 }
 
 inline bool operator==(const Point& a, const Point& b) {
     return a.x == b.x && a.y == b.y;
+}
+
+inline bool operator!=(const Point& a, const Point& b) {
+    return a.x != b.x || a.y != b.y;
 }
 
 inline int n_windows(const Game& game) {

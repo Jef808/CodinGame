@@ -5,92 +5,123 @@
 #include "io.h"
 #include "utils.h"
 
+#include <algorithm>
 #include <cassert>
 
 namespace sok2 {
 
+
 class Agent {
+    struct Interval {
+        int m;
+        int M;
+        int size() const { return M - m; }
+    };
+    struct Rectangle {
+        Interval int_x;
+        Interval int_y;
+    };
 public:
     Agent(const Game& game)
         : m_game{ game }
-        , min_x{ 0 }
-        , max_x{ game.building.width }
-        , min_y{ 0 }
-        , max_y{ game.building.height }
+        , rect{ {0, game.building.width}, {0, game.building.height} }
         , prev_pos{ game.current_pos }
     {}
 
-    Window choose_move() const {
-        if (not found_x) {
-            return search_x();
+    Window choose_move() {
+        if (found_x() && found_y()) {
+            return find_bomb();
         }
-        if (not found_y) {
-            return search_y();
-        }
-        return get_bomb();
+
+        const Interval& interval = not found_x() ? rect.int_x : rect.int_y;
+        int proj_p = not found_x() ? m_game.current_pos.x : m_game.current_pos.y;
+        int proj_other = not found_x() ? m_game.current_pos.y : m_game.current_pos.x;
+
+        int proj_q = search(interval, proj_p);
+
+        /* Cache the current position before the game gets updated */
+        save_current_pos();
+
+        return not found_x() ? Window{ proj_q, proj_other } : Window{ proj_other, proj_q };
     }
 
     void update_data(Heat move_heat) {
-        if (not found_x) {
-            if (move_heat == Heat::neutral) {
-                found_x = true;
-                min_x = max_x = (prev_pos.x + m_game.current_pos.x) / 2;
-            }
-            else {
-                int diff = m_game.current_pos.x - prev_pos.x;
-                int& bound = diff > 0 ? move_heat == Heat::warm ? max_x : min_x
-                    : move_heat == Heat::warm ? min_x : max_x;
-                bound = (prev_pos.x + m_game.current_pos.x) / 2;
-            }
+        assert(prev_pos != m_game.current_pos
+               && "Called update_data without having played a move");
+
+        last_heat = move_heat;
+
+        /* To avoid writing the same code twice. */
+        Interval& interval = found_x() ? rect.int_y : rect.int_x;
+        int prev = found_x() ? prev_pos.y : prev_pos.x;
+        int curr = found_x() ? m_game.current_pos.y : m_game.current_pos.x;
+        int midpoint = (prev + curr) / 2;
+
+        /* If the heat is neutral, the current interval is shrinked to a point. */
+        if (last_heat == Heat::neutral) {
+            interval.m = interval.M = midpoint;
         }
+
+        /* Otherwise, shrink the interval according to move_heat and the
+         * direction of the previous move. */
         else {
-            if (move_heat == Heat::neutral) {
-                found_y = true;
-                min_y = max_y = (prev_pos.y + m_game.current_pos.y) / 2;
+            int diff = curr - prev;
+
+            if (last_heat == Heat::warm) {
+                if (prev < curr) {
+                    interval.m = midpoint;
+                }
+                else {
+                    interval.M = midpoint;
+                }
             }
             else {
-                int diff = m_game.current_pos.y - prev_pos.y;
-                int& bound = diff > 0 ? move_heat == Heat::warm ? max_y : min_y
-                    : move_heat == Heat::warm ? min_y : max_y;
-                bound = (prev_pos.y + m_game.current_pos.y) / 2;
+                if (prev < curr) {
+                    interval.M = midpoint;
+                }
+                else {
+                    interval.m = midpoint;
+                }
             }
         }
-        prev_pos = m_game.current_pos;
     }
 
 private:
     const Game& m_game;
 
-    bool found_x{ false };
-    bool found_y{ false };
+    bool found_x() const { return rect.int_x.size() == 1; }
+    bool found_y() const { return rect.int_y.size() == 1; }
 
-    int min_x;
-    int max_x;
-    int min_y;
-    int max_y;
+    Rectangle rect;
 
     Window prev_pos;
+    Heat last_heat;
 
-    Window search_x() const {
-        int nx = opposite(min_x, max_x, m_game.current_pos.x);
-        if (nx == m_game.current_pos.x) {
-            nx = nx < max_x - 2 ? nx + 2 : nx - 2;
+    /**
+     * Perform one iteration of a 1-dimensional binary search.
+     *
+     * @Note  If pos is in the middle of an even-length interval, opposite
+     * returns pos itself.
+     */
+    int search(const Interval& interval, int p) const {
+        int Max = found_x() ? m_game.building.height - 1: m_game.building.width - 1;
+
+        int q = opposite(interval.m, interval.M, Max, p);
+
+        if (q == m_game.current_pos.x) {
+            q = q < Max - 2 ? q + 2 : q - 2;
         }
-        return { nx, m_game.current_pos.y };
+
+        return q;
     }
 
-    Window search_y() const {
-        int ny = opposite(min_y, max_y, m_game.current_pos.y);
-        if (ny == m_game.current_pos.y) {
-            ny = ny < max_x - 2 ? ny + 2 : ny - 2;
-        }
-        return { m_game.current_pos.x, ny };
+    Window find_bomb() const {
+        assert(found_x() && found_y() && "Trying to get bomb before grid is solved");
+        return { rect.int_x.M, rect.int_y.M };
     }
 
-    Window get_bomb() const {
-        assert(found_x && found_y && "Trying to get bomb before grid is solved");
-        assert(min_x == max_x && min_y == max_y && "Solved grid but bounds are not equal");
-        return { min_x, min_y };
+    void save_current_pos() {
+        prev_pos = m_game.current_pos;
     }
 };
 

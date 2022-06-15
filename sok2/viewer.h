@@ -153,12 +153,12 @@ private:
 const std::string square_s      = "\u25A0";                               // unicode filled square
 const std::string reset_s       = "\033[0m";                              // default
 
-const std::string noncandidate_s= "\033[30;1;4m" + square_s + reset_s;    // black
+const std::string noncandidate_s= "\033[30;1m"   + square_s + reset_s;    // black
 const std::string candidate_s   = "\033[34;1;4m" + square_s + reset_s;    // blue
 const std::string critical_s    = "\033[32;1;4m" + square_s + reset_s;    // green
-const std::string next_window_s = "\033[35;1;4m" + square_s + reset_s;    // magenta
-const std::string last_window_s = "\033[33;1;4m" + square_s + reset_s;    // yellow
-const std::string bomb_window_s = "\033[31;1;4m" + square_s + reset_s;    // red
+const std::string next_window_s = "\033[35;1;4m" + square_s + reset_s;    // red
+const std::string last_window_s = "\033[31;1;4m" + square_s + reset_s;    // magenta
+const std::string bomb_window_s = "\033[33;1;4m" + square_s + reset_s;    // yellow
 
 
 inline std::string_view make_string(CC cc) {
