@@ -4,7 +4,7 @@
 namespace sok2 {
 
 
-enum class heat { unknown, colder, warmer, same };
+enum class Heat { unknown, cold, warm, neutral };
 
 struct Point {
     int x;
@@ -20,7 +20,7 @@ struct Building {
 
 struct Game {
     Building building;
-    int jumps;
+    int turns_left;
     Window current_pos;
 };
 

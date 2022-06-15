@@ -1,10 +1,11 @@
 /**
- * Simulate online play using `referee.h'.
+ * Play against the local referee using two binary searches.
  */
 #include "types.h"
 #include "io.h"
 #include "referee.h"
 #include "viewer.h"
+#include "agent.h"
 
 #include <iostream>
 #include <sstream>
@@ -47,14 +48,41 @@ int main(int argc, char *argv[]) {
     viewer.view_legend(cout);
     viewer.view(cout);
 
-    for (;;) {
-        cout << "Pick a move" << endl;
+    Agent agent{ game };
 
-        referee.process_turn(cin, cout);
+    bool going = true;
+
+    std::string ibuf;
+    std::string obuf;
+
+    while (going) {
+        Window move = agent.choose_move();
+
+        ibuf.clear();
+        obuf.clear();
+        std::stringstream iss{ ibuf };
+        std::stringstream oss{ obuf };
+
+        iss << move;
+
+        going = referee.process_turn(iss, oss);
+
+        Heat move_heat;
+        oss >> move_heat;
+
+        cout << "Chose move " << move << '\n'
+             << "..... " << move_heat << endl;
+
+        agent.update_data(move_heat);
 
         viewer.view_legend(cout);
         viewer.view(cout);
+
+        char c;
+        cout << "Input any character to continue..." << endl;
+        cin >> c;
+        cin.ignore();
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }
