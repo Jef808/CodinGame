@@ -11,16 +11,18 @@
 namespace sok2 {
 
 
+struct Interval {
+    int m;
+    int M;
+    int size() const { return M - m; }
+};
+struct Rectangle {
+    Interval int_x;
+    Interval int_y;
+};
+
+
 class Agent {
-    struct Interval {
-        int m;
-        int M;
-        int size() const { return M - m; }
-    };
-    struct Rectangle {
-        Interval int_x;
-        Interval int_y;
-    };
 public:
     Agent(const Game& game)
         : m_game{ game }
@@ -29,20 +31,21 @@ public:
     {}
 
     Window choose_move() {
+        /* After find the bomb, we simply pick it. */
         if (found_x() && found_y()) {
             return find_bomb();
         }
 
-        const Interval& interval = not found_x() ? rect.int_x : rect.int_y;
-        int proj_p = not found_x() ? m_game.current_pos.x : m_game.current_pos.y;
-        int proj_other = not found_x() ? m_game.current_pos.y : m_game.current_pos.x;
+        const Interval& interval = found_x() ? rect.int_y : rect.int_x;
+        int proj_p     = found_x() ? m_game.current_pos.y : m_game.current_pos.x;
+        int proj_other = found_x() ? bomb_x : m_game.current_pos.y;
 
         int proj_q = search(interval, proj_p);
 
         /* Cache the current position before the game gets updated */
         save_current_pos();
 
-        return not found_x() ? Window{ proj_q, proj_other } : Window{ proj_other, proj_q };
+        return found_x() ? Window{ proj_other, proj_q } : Window{ proj_q, proj_other };
     }
 
     void update_data(Heat move_heat) {
@@ -57,9 +60,13 @@ public:
         int curr = found_x() ? m_game.current_pos.y : m_game.current_pos.x;
         int midpoint = (prev + curr) / 2;
 
-        /* If the heat is neutral, the current interval is shrinked to a point. */
+        /*
+         * If the heat is neutral, the current interval is shrinked to a point
+         * and we record the value just found.
+         */
         if (last_heat == Heat::neutral) {
-            interval.m = interval.M = midpoint;
+            int& bomb_c = found_x() ? bomb_y : bomb_x;
+            bomb_c = interval.m = interval.M = midpoint;
         }
 
         /* Otherwise, shrink the interval according to move_heat and the
@@ -89,13 +96,16 @@ public:
 private:
     const Game& m_game;
 
-    bool found_x() const { return rect.int_x.size() == 1; }
-    bool found_y() const { return rect.int_y.size() == 1; }
-
     Rectangle rect;
 
     Window prev_pos;
     Heat last_heat;
+
+    int bomb_x{ -1 };
+    int bomb_y{ -1 };
+
+    bool found_x() const { return rect.int_x.size() == 0; }
+    bool found_y() const { return rect.int_y.size() == 0; }
 
     /**
      * Perform one iteration of a 1-dimensional binary search.
