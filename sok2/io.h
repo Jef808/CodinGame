@@ -23,29 +23,32 @@ inline std::istream& operator>>(std::istream& is, Game& g) {
               >> g.current_pos;
 }
 
-inline std::ostream& operator<<(std::ostream& os, Window& w) {
+inline std::ostream& operator<<(std::ostream& os, const Window& w) {
     return os << w.x << ' ' << w.y;
 }
 
-inline std::ostream& operator<<(std::ostream& os, Heat& h) {
+inline std::ostream& operator<<(std::ostream& os, const Heat& h) {
   switch (h) {
     case Heat::cold:    return os << "COLDER";
     case Heat::warm:    return os << "WARMER";
     case Heat::neutral: return os << "SAME";
+    case Heat::unknown: return os << "UNKNOWN";
     default:
       assert(false && "Invalid Heat value while outputting to ostream");
   }
 }
 
 inline std::istream& operator>>(std::istream& is, Heat& h) {
-  char c;
-  is >> c;
-  is.ignore();
+  static std::string buf;
+  is >> buf;
 
-  switch (c) {
+  switch (buf[0]) {
     case 'W': h = Heat::warm;    break;
     case 'C': h = Heat::cold;    break;
     case 'S': h = Heat::neutral; break;
+    case 'U': h = Heat::unknown; break;
+    default:
+      assert(false && "Invalid Heat value fed to istream");
   }
 
   return is;

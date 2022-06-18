@@ -46,10 +46,6 @@ inline Heat compare_distances(const Point& p, const Point& hot, const Point& col
     return compare(distance_squared(p, hot), distance_squared(p, cold));
 }
 
-inline double midpoint(int a, int b) {
-    return (a + b) / 2.0;
-}
-
 /**
  * Return the point opposite to p with respect to the
  * segment [m, M] sitting inside of [0, Max], making
@@ -60,6 +56,8 @@ inline double midpoint(int a, int b) {
  * @Param M  The upper bound of the interval
  * @Param Max  The global width/height of the bounding grid
  * @Param p  The point to reflect
+ *
+ * @Note  Midpoint is m + M - p
  */
 inline int opposite(int m, int M, int Max, int p) {
     return std::clamp(m + M - p + ((m + M) & 1) * (1 - 2 * (p & 1)), 0, Max);

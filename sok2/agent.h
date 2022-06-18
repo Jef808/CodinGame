@@ -14,7 +14,7 @@ namespace sok2 {
 struct Interval {
     int m;
     int M;
-    int size() const { return M - m; }
+    int size() const { return M - m + 1; }
 };
 struct Rectangle {
     Interval int_x;
@@ -26,26 +26,40 @@ class Agent {
 public:
     Agent(const Game& game)
         : m_game{ game }
-        , rect{ {0, game.building.width}, {0, game.building.height} }
+        , rect{ {0, game.building.width - 1}, {0, game.building.height - 1} }
         , prev_pos{ game.current_pos }
     {}
 
     Window choose_move() {
+        Window ret{ bomb_x, bomb_y };
+
         /* After find the bomb, we simply pick it. */
         if (found_x() && found_y()) {
-            return find_bomb();
+            return ret;
         }
 
-        const Interval& interval = found_x() ? rect.int_y : rect.int_x;
-        int proj_p     = found_x() ? m_game.current_pos.y : m_game.current_pos.x;
-        int proj_other = found_x() ? bomb_x : m_game.current_pos.y;
+        const Interval& interval = found_x()
+            ? rect.int_y
+            : rect.int_x;
 
-        int proj_q = search(interval, proj_p);
+        int p_comp = found_x()
+            ? m_game.current_pos.y
+            : m_game.current_pos.x;
+
+        int& p_other_comp = found_x()
+            ? ret.x
+            : ret.y = m_game.current_pos.y;
+
+        (found_x() ? ret.y : ret.x) = search(interval, p_comp);
 
         /* Cache the current position before the game gets updated */
         save_current_pos();
 
-        return found_x() ? Window{ proj_other, proj_q } : Window{ proj_q, proj_other };
+        assert(0 <= ret.x < m_game.building.width
+               && 0 <= ret.y < m_game.building.height
+               && "Agent is returning an invalid move");
+
+        return ret;
     }
 
     void update_data(Heat move_heat) {
@@ -54,7 +68,6 @@ public:
 
         last_heat = move_heat;
 
-        /* To avoid writing the same code twice. */
         Interval& interval = found_x() ? rect.int_y : rect.int_x;
         int prev = found_x() ? prev_pos.y : prev_pos.x;
         int curr = found_x() ? m_game.current_pos.y : m_game.current_pos.x;
@@ -65,16 +78,19 @@ public:
          * and we record the value just found.
          */
         if (last_heat == Heat::neutral) {
-            int& bomb_c = found_x() ? bomb_y : bomb_x;
-            bomb_c = interval.m = interval.M = midpoint;
+            (found_x() ? bomb_y : bomb_x) = interval.m = interval.M = midpoint;
         }
 
         /* Otherwise, shrink the interval according to move_heat and the
-         * direction of the previous move. */
+         * direction of the previous move.
+         */
         else {
             int diff = curr - prev;
 
             if (last_heat == Heat::warm) {
+                if (interval.size() < 4 && (curr == interval.m || curr == interval.M)) {
+                    (found_x() ? bomb_y : bomb_x) = interval.m = interval.M = curr;
+                }
                 if (prev < curr) {
                     interval.m = midpoint;
                 }
@@ -83,12 +99,18 @@ public:
                 }
             }
             else {
+                if (interval.size() < 4 && (curr == interval.m || curr == interval.M)) {
+                    (found_x() ? bomb_y : bomb_x) = (curr == interval.m ? interval.M : interval.m);
+                }
                 if (prev < curr) {
                     interval.M = midpoint;
                 }
                 else {
                     interval.m = midpoint;
                 }
+            }
+            if (interval.size() == 1) {
+                (found_x() ? bomb_y : bomb_x) = (curr == interval.m ? interval.M : interval.m);
             }
         }
     }
@@ -104,8 +126,8 @@ private:
     int bomb_x{ -1 };
     int bomb_y{ -1 };
 
-    bool found_x() const { return rect.int_x.size() == 0; }
-    bool found_y() const { return rect.int_y.size() == 0; }
+    bool found_x() const { return bomb_x > -1; }
+    bool found_y() const { return bomb_y > -1; }
 
     /**
      * Perform one iteration of a 1-dimensional binary search.
@@ -114,7 +136,8 @@ private:
      * returns pos itself.
      */
     int search(const Interval& interval, int p) const {
-        int Max = found_x() ? m_game.building.height - 1: m_game.building.width - 1;
+        int Max = found_x() ? m_game.building.height - 1
+            : m_game.building.width - 1;
 
         int q = opposite(interval.m, interval.M, Max, p);
 
@@ -123,11 +146,6 @@ private:
         }
 
         return q;
-    }
-
-    Window find_bomb() const {
-        assert(found_x() && found_y() && "Trying to get bomb before grid is solved");
-        return { rect.int_x.M, rect.int_y.M };
     }
 
     void save_current_pos() {
