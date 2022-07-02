@@ -10,6 +10,7 @@ int main(int argc, char *argv[]) {
   Game game;
   game.init_input(std::cin);
   Agent agent(game);
+  agent.init();
 
   while (true) {
     game.turn_input(std::cin);
@@ -17,7 +18,6 @@ int main(int argc, char *argv[]) {
     // assert(okay);
 
     Move move = agent.choose_move();
-    game.apply(move);
 
     if (move.type == Move::Type::Wait) {
       std::cout << "WAIT" << std::endl;
@@ -25,6 +25,8 @@ int main(int argc, char *argv[]) {
       auto [x, y] = game.coords(move.index);
       std::cout << x << ' ' << y << std::endl;
     }
+
+    game.apply(move);
   }
 
   return EXIT_SUCCESS;
