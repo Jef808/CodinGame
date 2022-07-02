@@ -7,13 +7,15 @@
 #ifndef DISTANCE_H_
 #define DISTANCE_H_
 
+#include "game.h"
+
 #include <algorithm>
 #include <cstdint>
 #include <vector>
 
 class GridDistance {
 public:
-  GridDistance(size_t width, size_t height);
+  GridDistance(const Game& game);
 
   void set_source(const size_t source);
 
@@ -38,8 +40,7 @@ public:
   void distance_sort(InputIter beg, InputIter end);
 
 private:
-  const size_t m_width;
-  const size_t m_height;
+  const Game& m_game;
 
   std::vector<int> m_dist;
   std::vector<size_t> m_parent;

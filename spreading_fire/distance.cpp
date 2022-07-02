@@ -1,4 +1,5 @@
 #include "distance.h"
+#include "game.h"
 
 #include <algorithm>
 #include <deque>
@@ -10,17 +11,17 @@ namespace {
 constexpr int INFTY = std::numeric_limits<int>::infinity();
 } // namespace
 
-GridDistance::GridDistance(size_t width, size_t height)
-  : m_width{width}, m_height{height}, m_dist{}, m_parent{}
+GridDistance::GridDistance(const Game& game)
+  : m_game{game}, m_dist{}, m_parent{}
 {
 
 }
 
 void GridDistance::set_source(const size_t source) {
-  m_dist.resize(m_width*m_height, INFTY);
+  m_dist.resize(m_game.size(), INFTY);
   std::fill(m_dist.begin(), m_dist.end(), INFTY);
 
-  m_parent.resize(m_width*m_height, 0);
+  m_parent.resize(m_game.size(), 0);
   std::fill(m_parent.begin(), m_parent.end(), INFTY);
 
   m_source = source;
@@ -37,7 +38,7 @@ void GridDistance::set_source(const size_t source) {
       int distance = m_dist[current];
       q.pop_front();
 
-      for (auto cur_nbh : {current - m_width, current - 1, current + 1, current + m_width}) {
+      for (auto cur_nbh : {current - m_game.width(), current - 1, current + 1, current + m_game.width()}) {
 
         if (not seen.count(cur_nbh)) {
           continue;
@@ -61,14 +62,6 @@ void GridDistance::set_source(const size_t source) {
 //   m_dist.clear();
 //   m_parent.clear();
 
-
-
-//   auto out = std::back_inserter(m_parent);
-
-//   for (size_t i = 0; i < m_width * m_height; ++i) {
-//     m_parent.push_back(i);
-//   }
-// }
 
 std::vector<size_t> GridDistance::get_path(size_t target) {
   std::vector<size_t> path;

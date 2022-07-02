@@ -10,7 +10,6 @@ int main(int argc, char *argv[]) {
   Game game;
   game.init_input(std::cin);
   Agent agent(game);
-  agent.init();
 
   while (true) {
     game.turn_input(std::cin);

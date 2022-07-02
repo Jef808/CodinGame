@@ -35,4 +35,7 @@ add_custom_target(sf_main_bundle ALL
   SOURCES ${spreading_fire_SOURCES} main.cpp)
 
 include_directories(${CMAKE_SOURCE_DIR})
+
+add_subdirectory(viewer)
+
 add_subdirectory(tests)

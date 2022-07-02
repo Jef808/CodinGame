@@ -15,8 +15,6 @@ class Agent {
 public:
   Agent(Game &game);
 
-  void init();
-
   /**
    * The main entry point for playing against the online judge.
    */
@@ -25,6 +23,14 @@ public:
   Move choose_random_move();
 
   size_t get_point_towards_houses();
+
+  /**
+   *
+   */
+  void collect_distances_data();
+
+  void collect_houses_data();
+
 
 private:
   Game &m_game;
