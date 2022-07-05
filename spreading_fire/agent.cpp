@@ -1,135 +1,164 @@
 #include "agent.h"
-#include "distance.h"
+#include "cell.h"
+#include "game.h"
 
 #include <algorithm>
-#include <random>
+#include <cassert>
+#include <deque>
 #include <iostream>
+#include <limits>
+#include <random>
+#include <deque>
 #include <vector>
+
+namespace {
+//static constexpr int INFTY = std::numeric_limits<int>::infinity();
+static constexpr int INFTY = 32000;
+}
 
 Agent::Agent(Game &game)
   : m_game{game}
-  , house_distance{game}
-  , fire_expand{game}
-  , O{ game.fire_origin }
-  , m_houses{}
+  , Duration{ Tree.DurationFire, House.DurationFire,
+              Tree.DurationCut, House.DurationCut }
+  , Value{ Tree.Value, House.Value }
+  , m_distances(game.size(), INFTY)
+  , m_parents(game.size())
 {
-
+  std::for_each(m_parents.begin(), m_parents.end(),
+    [](auto& p){
+      for (auto i : {EAST, NORTH, WEST, SOUTH}) { p[i] = INFTY; }
+    });
 }
-
 
 
 Move Agent::choose_move() {
-  Move move {Move::Type::Wait, NULL_INDEX};
-
-  if (m_game.m_cooldown > 0) {
-    return move;
-  }
+  if (m_game.m_cooldown > 0) { return {Move::Type::Wait, NULL_INDEX}; }
 
   m_game.get_bdry();
+  size_t n = m_game.m_outer_bdry.size();
 
-  move.index = get_point_towards_houses();
-
-  if (move.index == NULL_INDEX) {
-
-    move = choose_random_move();
-
-    if (move.index == NULL_INDEX)  {
-      return move;
-    }
+  if (n == 0) {
+    return choose_random_move();
   }
 
-  move.type = Move::Type::Cut;
-  return move;
+  return { Move::Type::Cut, m_game.m_outer_bdry[rand() % n] };
+  // if (move.index == NULL_INDEX) {
+
+
+  // if (move.index == NULL_INDEX)  { return move; }
+
+  // move.type = Move::Type::Cut;
+  // return move;
 }
 
 
-void Agent::collect_houses_data() {
-  for (const auto& c : m_game.m_cells) {
-    if (c.type() == Cell::Type::House)
-      m_houses.emplace_back(c.index());
-  }
-
-  std::sort(m_houses.begin(), m_houses.end(),
-            [&](auto a, auto b) {
-              return manhattan_distance(O, m_game.coords(a)) <
-                     manhattan_distance(O, m_game.coords(b));
-            });
-
-  house_distance.set_source(m_houses.front());
-}
-
-
-size_t Agent::get_point_towards_houses() {
-  size_t ret = NULL_INDEX;
-
-  if (m_houses.empty() || m_game.m_outer_bdry.empty()) {
-    return ret;
-  }
-
-  // Sort the cells past the fire horizon wrt to their distance
-  // to the first house.
-  house_distance.distance_sort(m_game.m_outer_bdry.begin(), m_game.m_outer_bdry.end());
-
-  return m_game.m_outer_bdry.front();
-}
-
-
-Move Agent::choose_random_move() {
+Move Agent::choose_random_move() const {
   static std::random_device rd;
   static std::mt19937 eng{ rd() };
 
-  //static std::vector<size_t> candidates;
+  //Move move{ Move::Type::Wait, NULL_INDEX };
 
-  Move ret{ Move::Type::Wait, NULL_INDEX };
+  // if (m_game.m_cooldown > 0) {
+  //   return move;
+  // }
 
-  if (m_game.m_cooldown > 0) {
-    return ret;
+  //const auto& candidates = m_game.m_outer_bdry;
+
+  std::vector<size_t> cands;
+
+  for (size_t c = 0; c < m_game.size(); ++c) {
+    if (m_game.is_flammable(c)) {
+      cands.push_back(c);
+    }
+  }
+  if (cands.empty()) {
+    assert(false);
   }
 
-  const auto& candidates = m_game.m_outer_bdry;
+  std::uniform_int_distribution<size_t>
+  dist{ 0, cands.size()-1 };
 
-
-  if (candidates.empty()) {
-    return ret;
-  }
-
-  std::uniform_int_distribution<size_t> dist(0, candidates.size()-1);
-  return { Move::Type::Cut, candidates[dist(eng)] };
+  return { Move::Type::Cut, cands[dist(eng)] };
 }
 
 
-void Agent::collect_distances_data() {
-  // Compute the
+size_t Agent::get_neighbour(size_t n, Direction d) const {
+  switch(d) {
+    case EAST:
+    case WEST:  return n + d;
+    case NORTH:
+    case SOUTH: return n + m_game.width() * d / 2;
+    default: throw std::runtime_error("Invalid direction");
+  }
+}
 
-  fire_expand.set_source(m_game.index(O.x, O.y));
 
-  // Get max number of rounds (before the fire expands to
-  // all the grid)
-  size_t T = 0;
 
-  if (m_game.m_width > m_game.m_height) {
-    for (auto j = 0; j < m_game.m_height; ++j)
-      for (auto i : { 0U, (unsigned)(m_game.m_width - 1) }) {
-        auto d = fire_expand.get_distance(m_game.m_width * j + i);
-        if (d > T) { T = d; }
+namespace {
+
+class EdgeCost {
+  const Game& game;
+public:
+  static constexpr int Infinite = INFTY;
+
+  EdgeCost(const Game& _game)
+    : game{_game}
+  {}
+  auto operator()(size_t source, size_t target) {
+    if (not game.is_flammable(target)) {
+      return Infinite;
     }
+    assert(source != target);// if (source == target) {
+    //   return Zero;
+    // }
+    return game.duration_fire(source);
   }
-  else {
-    for (auto i = 0; i < m_game.m_width; ++i)
-      for (auto j : { 0U, (unsigned)(m_game.m_height - 1) }) {
-        auto d = fire_expand.get_distance(m_game.m_width * j + i);
-        if (d > T) { T = d; }
+};
+
+} // namespace
+
+
+void Agent::generate_distance_map() {
+  EdgeCost edge_cost{m_game};
+
+  std::deque<size_t> boundary;
+  std::vector<int> seen(m_game.size(), 0);
+
+  m_distances[m_game.fire_origin()] = 0;
+  boundary.push_back(m_game.fire_origin());
+
+  while (not boundary.empty()) {
+    size_t current = boundary.front();
+    boundary.pop_front();
+    const int distance = m_distances[current];
+
+    for (Direction d : {EAST, NORTH, WEST, SOUTH}) {
+      const size_t nbh = get_neighbour(current, d);
+
+      // Avoid interior points
+      if (seen[nbh] > 0) {
+        continue;
+      }
+
+      const int this_distance = distance + edge_cost(current, nbh);
+
+      // Mark points which are not flammable as seen and proceed to next nbh
+      if (this_distance >= EdgeCost::Infinite) {
+        seen[nbh] = 1;
+        continue;
+      }
+
+      // Otherwise, add nbh to the end of the queue and update stats
+      boundary.push_back(nbh);
+
+      m_parents[nbh][-d] = this_distance;
+
+      if (this_distance < m_distances[nbh]) {
+        m_distances[nbh] = this_distance;
+      }
     }
+
+    // Add to seen set once a square's four neighbours are processed
+    seen[current] = 1;
   }
-
-  // Compute the value destroyed if let fire is let alone by distance
-  // from the start (corresponding to each expansion)
-  std::vector<int> value_burned(T, 0);
-
-  for (size_t n = 0; n < m_game.size(); ++n) {
-    size_t t = fire_expand.get_distance(n);
-    value_burned[t] += m_game.value(n);
-  }
-
-
 }

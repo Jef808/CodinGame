@@ -4,6 +4,7 @@
 #include <cassert>
 #include <iostream>
 #include <functional>
+#include <limits>
 #include <set>
 #include <tuple>
 
@@ -13,22 +14,46 @@ Point Game::coords(size_t ndx) const {
 }
 
 int Game::duration_cut(size_t ndx) const {
-  return m_cells[ndx].type() == Cell::Type::Tree ? Tree.DurationCut
-                                                 : House.DurationCut;
+  switch (m_cells[ndx].type()) {
+    case Cell::Type::Tree: return Tree.DurationCut;
+    case Cell::Type::House: return House.DurationCut;
+    default: return std::numeric_limits<int>::infinity();
+  }
 }
 
 int Game::duration_fire(size_t ndx) const {
-  return m_cells[ndx].type() == Cell::Type::Tree ? Tree.DurationFire
-                                                 : House.DurationFire;
+    switch (m_cells[ndx].type()) {
+      case Cell::Type::Tree: return Tree.DurationFire;
+      case Cell::Type::House: return House.DurationFire;
+      default: return std::numeric_limits<int>::infinity();
+  }
 }
 
-void Game::init_input(std::istream &is) {
-  using namespace std::placeholders;
+namespace {
 
+template<typename Cont>
+class CellInserter {
+  Cont& m_cont;
+public:
+  CellInserter(Cont& cont) : m_cont{cont} {}
+
+  auto operator()(size_t n) {
+    return [&, n](Cell::Type t) {
+      return m_cont.emplace_back(t, Cell::Status::NoFire, n);
+    };
+  }
+};
+
+template<typename Cont>
+inline CellInserter<Cont> make_cell_inserter(Cont& cont) { return CellInserter<Cont>(cont); }
+
+}  // namespace
+
+void Game::init_input(std::istream &is) {
   is >> Tree.DurationCut >> Tree.DurationFire >> Tree.Value;
   is >> House.DurationCut >> House.DurationFire >> House.Value;
   is >> m_width >> m_height;
-  is >> fire_origin.x >> fire_origin.y;
+  is >> m_fire_origin.x >> m_fire_origin.y;
 
   m_fire_progress.resize(size(), -1);
   m_bdry.reserve(size());
@@ -36,28 +61,21 @@ void Game::init_input(std::istream &is) {
   m_cells.reserve(size());
 
   std::string buf;
-
-  auto type = Cell::Type::Tree;
-  auto CellCtor = [&, s=Cell::Status::NoFire](auto t, auto n) {
-    return m_cells.emplace_back(t, s, n);
-  };
-  auto CCtor = std::bind(CellCtor, std::ref(type), _1);
+  auto cell_inserter = make_cell_inserter(m_cells);
 
   for (size_t y = 0; y < m_height; ++y) {
     is >> buf;
     for (size_t x = 0; x < m_width; ++x) {
-
+      auto in = cell_inserter(index(x, y));
       switch (buf[x]) {
-        case '#': type = Cell::Type::Safe; break;
-        case '.': type = Cell::Type::Tree; break;
-        case 'X': type = Cell::Type::House; break;
+        case '#': in(Cell::Type::Safe); break;
+        case '.': in(Cell::Type::Tree); break;
+        case 'X': in(Cell::Type::House); break;
       }
-
-      const Cell& cell = CCtor(index(x, y));
     }
   }
 
-  const size_t fire_origin_ndx = index(fire_origin.x, fire_origin.y);
+  const size_t fire_origin_ndx = index(m_fire_origin.x, m_fire_origin.y);
   m_fire_progress[fire_origin_ndx] = 0;
   m_cells[fire_origin_ndx].set_on_fire();
   m_cooldown = 0;
@@ -158,10 +176,8 @@ void Game::get_bdry() {
 
 void Game::expand_fire(size_t n) {
   for (auto of : offsets(n)) {
-    if (m_cells[of].type() != Cell::Type::Safe) {
-      if (m_cells[of].status() == Cell::Status::NoFire) {
+    if (is_flammable(of)) {
         m_cells[of].set_on_fire();
-      }
     }
   }
 }
