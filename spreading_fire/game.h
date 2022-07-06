@@ -29,6 +29,10 @@ public:
   bool test_against_turn_input();
 
   void apply(const Move &move);
+  unsigned int turn() const { return m_turn; }
+  bool is_ready() const { return m_cooldown == 0; }
+  bool is_terminal() const;
+
   void expand_fire(size_t n);
 
   size_t width() const { return m_width; }
@@ -59,6 +63,7 @@ private:
   size_t m_height;
   Point m_fire_origin;
   int m_cooldown;
+  size_t m_turn;
   std::vector<int> m_fire_progress;
   std::vector<size_t> m_bdry;
   std::vector<size_t> m_outer_bdry;

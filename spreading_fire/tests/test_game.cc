@@ -65,8 +65,6 @@ int main(int argc, char *argv[]) {
   std::cerr << "Initialized the viewer" << std::endl;
 
 
-
-
   bool should_step_game = true;
 
   // run the main loop
@@ -74,7 +72,8 @@ int main(int argc, char *argv[]) {
   {
     if (should_step_game) {
       step(game, agent);
-      viewer.append_data(game);
+      viewer.set_data(game);
+      viewer.next();
       should_step_game = false;
     }
 

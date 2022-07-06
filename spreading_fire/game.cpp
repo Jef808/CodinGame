@@ -183,14 +183,15 @@ void Game::expand_fire(size_t n) {
 }
 
 void Game::apply(const Move &move) {
-  if (move.type == Move::Type::Wait) {
-    if (m_cooldown > 0) {
-      get_bdry();
-      assert(m_cooldown > 0 ||
-             m_outer_bdry.empty() &&
-                 "Failed when applying 'Wait' while cooldown is zero");
-    }
-  } else if (move.type == Move::Type::Cut) {
+  // if (move.type == Move::Type::Wait) {
+  //   if (m_cooldown > 0) {
+  //     get_bdry();
+  //     assert(m_cooldown > 0 ||
+  //            m_outer_bdry.empty() &&
+  //                "Failed when applying 'Wait' while cooldown is zero");
+  //   }
+  //}
+  if (move.type == Move::Type::Cut) {
     assert(m_cooldown == 0 && "Failed at non-zero cutting countdown");
     assert(m_cells[move.index].type() != Cell::Type::Safe &&
            "Failed when trying to cut a Safe cell.");
@@ -219,4 +220,15 @@ void Game::apply(const Move &move) {
       m_cooldown = m_cells[n].cutting_countdown() + 1;
     }
   }
+
+  ++m_turn;
+}
+
+bool Game::is_terminal() const {
+  for (const auto& c : m_cells) {
+    if (c.status() == Cell::Status::OnFire) {
+      return false;
+    }
+  }
+  return true;
 }

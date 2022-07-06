@@ -87,16 +87,11 @@ private:
     int house;
   } Value;
 
+  /** The distance table */
   std::vector<int> m_distances;
 
+  /** The distance value at each parent */
   std::vector<ParentDistances> m_parents;
-
-  // /**
-  //  * Vector representation of a game's grid's distance function from
-  //  * the game's fire origin point.
-  //  */
-  // struct { std::vector<int> indices; }
-  // RingOfFire;
 
   /**
    * Get the index of interior squares' neighbours.
@@ -107,7 +102,10 @@ private:
   size_t get_neighbour(size_t s, Direction d) const;
 };
 
-
+/**
+ * Store the length of the shortest path going through each
+ * parent by direction.
+ */
 class ParentDistances {
     std::array<int, 4> parents;
   public:

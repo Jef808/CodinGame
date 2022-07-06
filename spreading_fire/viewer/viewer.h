@@ -52,33 +52,116 @@ int tr(const Cell& c) {
 
 public:
 
+    /**
+     * Set up the size of the grids that will be drawn, and initialize
+     * the initial view from the passed `game` parameter.
+     */
     bool init(const Game& game) {
-        m_width = game.width();
-        m_height = game.height();
-        m_tile_size = sf::Vector2u(64, 64);
+        // Clear out any previous data
+        m_history.clear();
 
         if (!m_tileset.loadFromFile(VIEWER_DATA_DIR "/Tileset_384x64.png")) {
             return false;
         }
 
+        if (!m_font.loadFromFile(VIEWER_DATA_DIR "/JetBrainsMono-Bold.ttf")) {
+            return false;
+        }
+
+        m_width = game.width();
+        m_height = game.height();
+        m_tile_size = sf::Vector2u(64, 64);
+        m_text_size = 30;
+        m_window_width = m_tile_size.x * m_width;
+        m_window_height = m_tile_size.y * m_height + 6 * m_text_size;
+        m_message_pos_y = m_window_height + m_text_size;
+
         // set the size data in the Tilemap utility
         m_tilemap.init(m_width, m_height, m_tile_size);
 
+        // resize the vertex array and set its primitive type to quads
         m_vertices.setPrimitiveType(sf::Quads);
-        // resize the vertex array
         m_vertices.resize(m_width * m_height * 4);
 
-        // Populate the array of index.
+        // Populate the array of index with the initial game state.
         history_append(game);
 
-        assert(next_draw == 0);
-
-        last_draw = next_draw;
-        set_data(next_draw++);
+        draw_index = 0;
+        populate_vertex_array();
+        draw_index = 1;
 
         return true;
     }
 
+    /**
+     * Use this to perform a data update query (simply calls history_append
+     * and set_data).
+     */
+    void set_data(const Game& game) {
+        history_append(game);
+        draw_index = m_history.size() - 1;
+        populate_vertex_array();
+    }
+
+    /**
+     * Increment the pointer to the grid that has to be drawn in `m_history`.
+     */
+    void next() {
+        if (draw_index < m_history.size() - 1) {
+            ++draw_index;
+            populate_vertex_array();
+        }
+    }
+
+    /**
+     * Decrement the pointer to the grid that has to be drawn in `m_history`.
+     */
+    void previous() {
+        if (draw_index > 0) {
+            --draw_index;
+            populate_vertex_array();
+        }
+    }
+
+    const sf::Font& font() const { return m_font; }
+
+    unsigned int window_width() const { return m_window_width; }
+    unsigned int window_height() const { return m_window_height; }
+    unsigned int text_size() const { return m_text_size; }
+    sf::Vector2f get_text_pos(const std::string& text) {
+        return {(float)m_message_pos_y, (float)text.size() * m_text_size};
+    }
+
+private:
+    virtual void draw(sf::RenderTarget& target, sf::RenderStates states) const
+    {
+        // apply the transform
+        states.transform *= getTransform();
+
+        // apply the tileset texture
+        states.texture = &m_tileset;
+
+        // draw the vertex array
+        target.draw(m_vertices, states);
+
+    }
+
+    unsigned int m_width;
+    unsigned int m_height;
+    sf::Vector2u m_tile_size;
+    unsigned int m_text_size;
+    unsigned int m_message_pos_y;
+    unsigned int m_window_width;
+    unsigned int m_window_height;
+
+    sf::Font m_font;
+    sf::Texture m_tileset;
+
+    sf::VertexArray m_vertices;
+    TileMap m_tilemap;
+
+    std::deque<std::vector<int>> m_history;
+    int draw_index = 0;
 
     /**
      * Translate the game's cell data into an array of
@@ -96,64 +179,16 @@ public:
         }
     }
 
-
     /**
-     * Send the array of tile index to the Tilemap utility which will
-     * populate the VertexArray from it.
+     * Send the indicated array of tile index to the Tilemap utility which will
+     * populate `m_vertices` from it.
      *
-     * @param history_index  the index inside of m_history of the grid
+     * @param history_index  the index in `m_history` of the grid
      * to be drawn.
      */
-    void set_data(size_t history_index) {
-        m_tilemap.set_tiles(m_history[history_index].data(), m_tileset, m_vertices);
+    void populate_vertex_array() {
+        m_tilemap.set_tiles(m_history[draw_index].data(), m_tileset, m_vertices);
     }
-
-    /**
-     * Use this to perform a data update query (simply calls history_append
-     * and set_data).
-     */
-    void append_data(const Game& game) {
-        assert(m_vertices.getPrimitiveType() == sf::Quads);
-
-        history_append(game);
-
-        assert(next_draw < m_history.size());
-        assert(m_vertices.getVertexCount() == 4 * m_history[next_draw].size());
-
-        assert(next_draw == last_draw + 1);
-
-        last_draw = next_draw;
-        set_data(next_draw++);
-    }
-
-    // std::function<void(void*)> callback_draw;
-    // void* callback_draw_data;
-
-
-private:
-    virtual void draw(sf::RenderTarget& target, sf::RenderStates states) const
-    {
-        // apply the transform
-        states.transform *= getTransform();
-
-        // apply the tileset texture
-        states.texture = &m_tileset;
-
-        // draw the vertex array
-        target.draw(m_vertices, states);
-    }
-
-    unsigned int m_width;
-    unsigned int m_height;
-    sf::Vector2u m_tile_size;
-
-    sf::VertexArray m_vertices;
-    sf::Texture m_tileset;
-    TileMap m_tilemap;
-
-    std::deque<std::vector<int>> m_history;
-    int next_draw = 0;
-    int last_draw = -1;
 };
 
 

@@ -1,5 +1,4 @@
 #include "agent.h"
-#include "cell.h"
 #include "game.h"
 
 #include <algorithm>
@@ -8,11 +7,10 @@
 #include <iostream>
 #include <limits>
 #include <random>
-#include <deque>
 #include <vector>
 
+
 namespace {
-//static constexpr int INFTY = std::numeric_limits<int>::infinity();
 static constexpr int INFTY = 32000;
 }
 
@@ -127,12 +125,14 @@ void Agent::generate_distance_map() {
   m_distances[m_game.fire_origin()] = 0;
   boundary.push_back(m_game.fire_origin());
 
-  while (not boundary.empty()) {
+  while (not boundary.empty())
+  {
     size_t current = boundary.front();
     boundary.pop_front();
     const int distance = m_distances[current];
 
-    for (Direction d : {EAST, NORTH, WEST, SOUTH}) {
+    for (Direction d : {EAST, NORTH, WEST, SOUTH})
+    {
       const size_t nbh = get_neighbour(current, d);
 
       // Avoid interior points
@@ -152,7 +152,6 @@ void Agent::generate_distance_map() {
       boundary.push_back(nbh);
 
       m_parents[nbh][-d] = this_distance;
-
       if (this_distance < m_distances[nbh]) {
         m_distances[nbh] = this_distance;
       }

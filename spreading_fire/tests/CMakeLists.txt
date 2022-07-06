@@ -5,6 +5,7 @@ target_compile_definitions(test_data_dir INTERFACE
 link_libraries(test_data_dir)
 
 set(SF_TESTS
+  test_play
   test_game
   test_agent_randommove
   test_agent_distancemap

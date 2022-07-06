@@ -111,7 +111,6 @@ int main(int argc, char *argv[]) {
     text.setFillColor(sf::Color::Black);
   }
 
-
   // The data used to display the function map:
   // A rectangle to be colored along with the distance
   std::vector<std::pair<sf::RectangleShape, sf::Text>> dmap_data;
