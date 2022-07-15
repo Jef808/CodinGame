@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+"""
+With the first given argument as SRC_DIR,
+concatenate all of SRC_DIR/<filename> where
+<filename> is any file listed in SRC_DIR/sources.txt
+"""
 
 import sys
 from pathlib import Path
