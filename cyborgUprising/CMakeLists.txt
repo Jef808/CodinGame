@@ -6,6 +6,8 @@ set( CMAKE_EXPORT_COMPILE_COMMANDS ON )
 # Sources            #
 ######################
 set(cyborgUprising_SOURCES
+  actions.h
+  actions.cpp
   game.h
   game.cpp
   search.h
