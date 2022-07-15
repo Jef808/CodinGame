@@ -1,0 +1,3 @@
+(projectile-project-compilation-dir . "/home/jfa/projects/CodinGame/cyborgUprising")
+(projectile-project-configure-cmd . "cmake -S . -B build")
+(projectile-project-compilation-cmd . "cmake --build build")
