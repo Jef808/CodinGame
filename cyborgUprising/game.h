@@ -73,18 +73,42 @@ struct Bomb {
 };
 
 struct Action {
-  struct Move {
-    int source;
-    int target;
-    int n_troops;
-  };
-  std::optional<Move> move;
+  enum { Wait, Move, Bomb, Prod } type{Wait};
 };
 
-inline Action make_wait() { return Action{}; }
+struct Wait : Action {
+  Wait() : Action{Action::Wait} {}
+};
+
+struct MoveTroops : Action {
+  MoveTroops(int _source, int _target, int _n_troops)
+      : Action{Action::Move}, source{_source}, target{_target},
+        n_troops{_n_troops} {}
+  int source;
+  int target;
+  int n_troops;
+};
+
+struct SendBomb : Action {
+  SendBomb(int _source, int _target)
+      : Action{Action::Bomb}, source{_source}, target{_target} {}
+  int source;
+  int target;
+};
+
+struct IncreaseProd : Action {
+  IncreaseProd(int _target) : Action{Action::Prod}, target{_target} {}
+  int target;
+};
+
+inline Action make_wait() { return Wait{}; }
 inline Action make_move(int source, int target, int n_troops) {
-  return Action{std::make_optional(Action::Move{source, target, n_troops})};
+  return MoveTroops{source, target, n_troops};
 }
+inline Action make_bomb(int source, int target) {
+  return SendBomb{source, target};
+}
+inline Action make_prod_increase(int target) { return IncreaseProd{target}; }
 
 std::ostream &operator<<(std::ostream &, const Action &);
 
