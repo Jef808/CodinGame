@@ -71,10 +71,9 @@ public:
         m_width = game.width();
         m_height = game.height();
         m_tile_size = sf::Vector2u(64, 64);
-        m_text_size = 30;
-        m_window_width = m_tile_size.x * m_width;
-        m_window_height = m_tile_size.y * m_height + 6 * m_text_size;
-        m_message_pos_y = m_window_height + m_text_size;
+        m_text_size = 24;
+        m_window_width = m_tile_size.x * m_width * 2;
+        m_window_height = m_tile_size.y * m_height * 2;
 
         // set the size data in the Tilemap utility
         m_tilemap.init(m_width, m_height, m_tile_size);
@@ -91,6 +90,13 @@ public:
         draw_index = 1;
 
         return true;
+    }
+
+    /**
+     * In pixels
+     */
+    void set_text_size(unsigned int size) {
+        m_text_size = size;
     }
 
     /**
@@ -125,12 +131,17 @@ public:
 
     const sf::Font& font() const { return m_font; }
 
+    sf::Vector2f get_text_pos() {
+        return {0.0, (float)m_text_size + m_tile_size.y * m_height};
+    }
+
+    unsigned int width() const { return m_width; }
+    unsigned int height() const { return m_height; }
     unsigned int window_width() const { return m_window_width; }
     unsigned int window_height() const { return m_window_height; }
+    sf::Vector2u tile_size() const { return m_tile_size; }
     unsigned int text_size() const { return m_text_size; }
-    sf::Vector2f get_text_pos(const std::string& text) {
-        return {(float)m_message_pos_y, (float)text.size() * m_text_size};
-    }
+
 
 private:
     virtual void draw(sf::RenderTarget& target, sf::RenderStates states) const
@@ -150,7 +161,6 @@ private:
     unsigned int m_height;
     sf::Vector2u m_tile_size;
     unsigned int m_text_size;
-    unsigned int m_message_pos_y;
     unsigned int m_window_width;
     unsigned int m_window_height;
 

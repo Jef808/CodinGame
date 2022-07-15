@@ -40,9 +40,6 @@ public:
 
   Cell(Type type, Status status, const size_t n);
 
-  /** Prevent any construction of invalid cell. */
-  Cell() = delete;
-
   /** Return the Type part of the cell's state. */
   Status status() const { return m_status; }
 
@@ -54,6 +51,9 @@ public:
 
   /** Set the cell on fire */
   void set_on_fire();
+
+  /** Set the cell to type safe */
+  void set_safe();
 
   /** The time before the cell is burnt, or -1 if no fire. */
   int fire_countdown() const { return m_fire_countdown; }

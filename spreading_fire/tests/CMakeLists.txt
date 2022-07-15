@@ -7,6 +7,7 @@ link_libraries(test_data_dir)
 set(SF_TESTS
   test_play
   test_game
+  test_search
   test_agent_randommove
   test_agent_distancemap
   )
@@ -14,10 +15,9 @@ set(SF_TESTS
 foreach(test ${SF_TESTS})
   add_executable(${test}
     ${test}.cc
-    ${CMAKE_SOURCE_DIR}/agent.h
-    ${CMAKE_SOURCE_DIR}/agent.cpp
     )
-target_link_libraries(${test} PUBLIC sf_LIB sf_viewer)
+target_link_libraries(${test} PUBLIC sf_LIB sf_viewer_LIB)
+target_link_libraries(${test} PUBLIC sf_LIB sf_search_LIB sf_viewer_LIB)
 endforeach()
 
 # add_executable(debug_agent_distancemap

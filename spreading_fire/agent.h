@@ -58,9 +58,8 @@ public:
    */
   void generate_distance_map();
 
-
-  // For debugging
-  const std::vector<int>& view_distance_map() const { return m_distances; }
+  const std::vector<int>& get_distance_map() const { return m_distances; }
+  const std::vector<ParentDistances>& get_parent_distances() const { return m_parents; }
 
 private:
   /** Local reference to the game's state and parameter. */
@@ -105,6 +104,13 @@ private:
 /**
  * Store the length of the shortest path going through each
  * parent by direction.
+ *
+ * Index goes as follows:
+ *
+ * SOUTH=-2: 0
+ * EAST =-1: 1
+ * WEST = 1: 2
+ * NORTH= 2: 3
  */
 class ParentDistances {
     std::array<int, 4> parents;
@@ -117,10 +123,12 @@ class ParentDistances {
     int operator[](int i) const {
       return parents[index_map(i)];
     }
-
   private:
     int index_map(int d) const {
-      return d + 3;
+      if (d > 0) {
+        return d + 1;
+      }
+      return d + 2;
     }
   };
 

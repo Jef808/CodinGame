@@ -79,16 +79,17 @@ int main(int argc, char *argv[]) {
                     while (not game.is_ready()) {
                         game.apply(Move{ Move::Type::Wait, NULL_INDEX });
                     }
+                    viewer.set_data(game);
                     message = "WAIT";
                     break;
                 }
 
             case sf::Event::MouseButtonPressed:
                 {
-                    auto x = event.mouseButton.x;
-                    auto y = event.mouseButton.y;
+                    auto x = event.mouseButton.x / 64;
+                    auto y = event.mouseButton.y / 64;
 
-                    size_t index = (x / 64) % game.width() + (y / 64) * game.width();
+                    size_t index = x % game.width() + y * game.width();
 
                     // Check mouse click is in range
                     if (index < 0 || index >= game.size()) {
@@ -133,13 +134,13 @@ int main(int argc, char *argv[]) {
     window.draw(viewer);
 
     // draw message
+    sf::Vector2f msg_pos = viewer.get_text_pos();
     msg.setString(message);
-    msg.setPosition(viewer.get_text_pos(message));
+    msg.setPosition(msg_pos);
 
     turn_msg.setString("Turn " + std::to_string(game.turn()));
-    sf::Vector2f turn_msg_pos = viewer.get_text_pos(turn_msg.getString());
-    turn_msg_pos.y += viewer.text_size();
-    turn_msg.setPosition(turn_msg_pos);
+
+    turn_msg.setPosition({msg_pos.x, msg_pos.y + viewer.text_size()});
 
     window.draw(msg);
     window.draw(turn_msg);

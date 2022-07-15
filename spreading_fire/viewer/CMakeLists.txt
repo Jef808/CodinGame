@@ -5,15 +5,15 @@ target_compile_definitions(viewer_data_dir INTERFACE
   "-DVIEWER_DATA_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/resources\"")
 link_libraries(viewer_data_dir)
 
-add_library(sf_viewer INTERFACE viewer.h tilemap.h)
+add_library(sf_viewer_LIB INTERFACE viewer.h tilemap.h)
 
-target_link_libraries( sf_viewer INTERFACE
+target_link_libraries( sf_viewer_LIB INTERFACE
   sfml-graphics
   sfml-window
   sfml-system
   viewer_data_dir
-  sf_LIB)
-
+  sf_LIB
+  sf_search_LIB)
 
 add_executable(helloworld helloworld.cpp)
 

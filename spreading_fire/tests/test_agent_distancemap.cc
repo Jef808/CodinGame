@@ -87,7 +87,7 @@ int main(int argc, char *argv[]) {
 
   // Generate the distance map
   agent.generate_distance_map();
-  const auto &dists = agent.view_distance_map();
+  const auto &dists = agent.get_distance_map();
 
 
   // Get the largest non-infinite distance

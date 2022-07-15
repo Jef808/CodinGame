@@ -20,7 +20,7 @@ You are given these parameters (6 values), the =size of the map=, the =starting 
 By blocking the spreading fire, you must save as much value as you can.
 
 ** Spread of fire
-A cell in fire stays in fire during =fireDuration= turns.
+A cell on fire stays in fire during =fireDuration= turns.
 Each cell has a =fireProgress= incremented each turns. Once this =fireProgress= reaches =fireDuration=, the tile is considered as burnt and propagates into the four adjacent cells (North, South, East, West) if they are not safe and not burnt (with =fireProgress= == -1).
 
 ** Block the spreading fire

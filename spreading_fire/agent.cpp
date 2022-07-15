@@ -53,7 +53,7 @@ Move Agent::choose_move() {
 Move Agent::choose_random_move() const {
   static std::random_device rd;
   static std::mt19937 eng{ rd() };
-
+  static std::vector<size_t> cands;
   //Move move{ Move::Type::Wait, NULL_INDEX };
 
   // if (m_game.m_cooldown > 0) {
@@ -62,7 +62,11 @@ Move Agent::choose_random_move() const {
 
   //const auto& candidates = m_game.m_outer_bdry;
 
-  std::vector<size_t> cands;
+  if (m_game.m_cooldown > 0) { return {Move::Type::Wait, NULL_INDEX}; }
+
+  cands.clear();
+  m_game.get_bdry();
+  size_t n = m_game.m_outer_bdry.size();
 
   for (size_t c = 0; c < m_game.size(); ++c) {
     if (m_game.is_flammable(c)) {

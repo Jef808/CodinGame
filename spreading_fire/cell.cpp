@@ -19,10 +19,10 @@ Cell::Cell(Type type, Status status, const size_t n)
 
 void Cell::start_cutting() {
     assert(m_type != Type::Safe && m_status != Cell::Status::OnFire);
-    m_type = Type::Safe;
     m_status = Status::Cutting;
+    m_type = Type::Safe;
     m_cutting_countdown =
-        m_type == Type::Tree ? Tree.DurationCut : House.DurationCut;
+        m_type == Type::Tree ? Tree.DurationCut - 1: House.DurationCut - 1;
   }
 
 
@@ -30,15 +30,16 @@ void Cell::set_on_fire() {
     assert(m_type != Type::Safe);
     m_status = Status::OnFire;
     m_fire_countdown =
-        m_type == Type::Tree ? Tree.DurationFire : House.DurationFire;
+        m_type == Type::Tree ? Tree.DurationFire - 1: House.DurationFire - 1;
   }
+
+void Cell::set_safe() { m_type = Type::Safe; }
 
 
 bool Cell::update() {
     if (m_status == Status::OnFire) {
       if (--m_fire_countdown == 0) {
         m_status = Status::Burnt;
-        m_fire_countdown = -1;
         return true;
       }
     } else if (m_status == Status::Cutting) {

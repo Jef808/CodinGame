@@ -5,6 +5,7 @@
 #include <iostream>
 #include <functional>
 #include <limits>
+#include <numeric>
 #include <set>
 #include <tuple>
 
@@ -49,6 +50,22 @@ inline CellInserter<Cont> make_cell_inserter(Cont& cont) { return CellInserter<C
 
 }  // namespace
 
+Game::Game(const Game& other)
+  : m_width{other.m_width}
+  , m_height{other.m_height}
+  , m_fire_origin{other.m_fire_origin}
+  , m_cooldown{other.m_cooldown}
+  , m_turn{other.m_turn}
+  , m_cells{other.m_cells}
+{
+}
+
+Game& Game::operator=(const Game& other) {
+  Game _game(other);
+  std::swap(_game, *this);
+  return *this;
+}
+
 void Game::init_input(std::istream &is) {
   is >> Tree.DurationCut >> Tree.DurationFire >> Tree.Value;
   is >> House.DurationCut >> House.DurationFire >> House.Value;
@@ -79,6 +96,7 @@ void Game::init_input(std::istream &is) {
   m_fire_progress[fire_origin_ndx] = 0;
   m_cells[fire_origin_ndx].set_on_fire();
   m_cooldown = 0;
+  m_turn = 0;
 }
 
 void Game::turn_input(std::istream &is) {
@@ -151,6 +169,17 @@ bool Game::test_against_turn_input() {
   return okay;
 }
 
+int Game::current_value() const {
+  int ret = 0;
+  for (size_t i = 0; i < size(); ++i) {
+    ret += m_cells[i].value();
+  }
+  return ret;
+  // return std::accumulate(m_cells.begin(), m_cells.end(), 0, [](const auto& c){
+  //   return c.value();
+  // });
+}
+
 void Game::get_bdry() {
   m_bdry.clear();
   m_outer_bdry.clear();
@@ -183,14 +212,6 @@ void Game::expand_fire(size_t n) {
 }
 
 void Game::apply(const Move &move) {
-  // if (move.type == Move::Type::Wait) {
-  //   if (m_cooldown > 0) {
-  //     get_bdry();
-  //     assert(m_cooldown > 0 ||
-  //            m_outer_bdry.empty() &&
-  //                "Failed when applying 'Wait' while cooldown is zero");
-  //   }
-  //}
   if (move.type == Move::Type::Cut) {
     assert(m_cooldown == 0 && "Failed at non-zero cutting countdown");
     assert(m_cells[move.index].type() != Cell::Type::Safe &&
@@ -199,36 +220,43 @@ void Game::apply(const Move &move) {
            "Failed when trying to cut a cell on fire.");
 
     m_cells[move.index].start_cutting();
+    m_cooldown = m_cells[move.index].cutting_countdown();
+  }
+  else {
+    m_cooldown -= 1;
   }
 
   for (size_t n = 0; n < size(); ++n) {
     if (m_cells[n].update()) {
       switch (m_cells[n].status()) {
-      case Cell::Status::Burnt:
-        expand_fire(n);
-        break;
-      case Cell::Status::Cut:
-        m_cooldown = 0;
-        break;
-      default:
-        assert(false && "Failed when update() returned true"
-                        "without the status being Burnt or Cut");
+        case Cell::Status::Burnt:
+          expand_fire(n);
+          break;
+        case Cell::Status::Cut:
+          m_cooldown = 0;
+          break;
+        default:
+          assert(false && "Failed when update() returned true"
+                 "without the status being Burnt or Cut");
       }
     }
-
-    if (m_cells[n].status() == Cell::Status::Cutting) {
-      m_cooldown = m_cells[n].cutting_countdown() + 1;
-    }
   }
-
   ++m_turn;
 }
 
 bool Game::is_terminal() const {
   for (const auto& c : m_cells) {
-    if (c.status() == Cell::Status::OnFire) {
+    if (c.type() != Cell::Type::Safe && c.status() == Cell::Status::NoFire) {
       return false;
     }
   }
   return true;
+}
+
+std::string Game::format_move(const Move& move) {
+  if (move.type == Move::Type::Wait) {
+    return "WAIT";
+  }
+  auto [x, y] = coords(move.index);
+  return std::to_string(x) + ' ' + std::to_string(y);
 }
