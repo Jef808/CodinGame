@@ -4,7 +4,11 @@
 #include <array>
 #include <iosfwd>
 #include <limits>
-#include <optional>
+#include <stdexcept>
+#include <string>
+#include <type_traits>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace cyborg {
@@ -14,7 +18,9 @@ constexpr const int INT_INFTY = 32000;
 struct Node;
 struct Edge;
 struct Bomb;
+
 struct Action;
+std::ostream &operator<<(std::ostream &, const cyborg::Action &);
 
 class Game {
 public:
@@ -72,45 +78,70 @@ struct Bomb {
   std::vector<int> maybe_targets;
 };
 
-struct Action {
-  enum { Wait, Move, Bomb, Prod } type{Wait};
+// Actions data:
+struct Wait {
+  std::string to_string() const;
 };
 
-struct Wait : Action {
-  Wait() : Action{Action::Wait} {}
-};
-
-struct MoveTroops : Action {
-  MoveTroops(int _source, int _target, int _n_troops)
-      : Action{Action::Move}, source{_source}, target{_target},
-        n_troops{_n_troops} {}
+struct MoveTroops {
+  std::string to_string() const;
   int source;
   int target;
   int n_troops;
 };
 
-struct SendBomb : Action {
-  SendBomb(int _source, int _target)
-      : Action{Action::Bomb}, source{_source}, target{_target} {}
+struct SendBomb {
+  std::string to_string() const;
   int source;
   int target;
+  SendBomb(int s, int t) : source{s}, target{t} {}
 };
 
-struct IncreaseProd : Action {
-  IncreaseProd(int _target) : Action{Action::Prod}, target{_target} {}
+struct IncreaseProd {
+  std::string to_string() const;
   int target;
 };
 
-inline Action make_wait() { return Wait{}; }
-inline Action make_move(int source, int target, int n_troops) {
-  return MoveTroops{source, target, n_troops};
-}
-inline Action make_bomb(int source, int target) {
-  return SendBomb{source, target};
-}
-inline Action make_prod_increase(int target) { return IncreaseProd{target}; }
+struct Action {
+  enum class Type { Wait, Move, Bomb, Prod };
+  union Data {
+    Wait wait;
+    MoveTroops move;
+    SendBomb bomb;
+    IncreaseProd prod;
+  };
+  Type type;
+  Data data{Wait{}};
+};
 
-std::ostream &operator<<(std::ostream &, const Action &);
+template <Action::Type T, typename... Args>
+inline Action make_action(Args &&...args);
+
+template <> inline Action make_action<Action::Type::Wait>() {
+  Action action{Action::Type::Wait};
+  action.data.wait = Wait{};
+  return action;
+}
+
+template <>
+inline Action make_action<Action::Type::Move>(const int &s, const int &t,
+                                              const int &n) {
+  Action action{Action::Type::Move};
+  action.data.move = MoveTroops{s, t, n};
+  return action;
+}
+
+template <>
+inline Action make_action<Action::Type::Bomb>(const int &s, const int &t) {
+  Action action{Action::Type::Move};
+  action.data.bomb = SendBomb{s, t};
+  return action;
+}
+template <> inline Action make_action<Action::Type::Prod>(const int &t) {
+  Action action{Action::Type::Wait};
+  action.data.prod = IncreaseProd{t};
+  return action;
+}
 
 } // namespace cyborg
 

@@ -15,7 +15,7 @@ Action search(const Game& game);
  * Attack from our biggest node
  * to its closest target.
  */
-Action attack_greedy(const Game& game);
+const std::vector<Action>& attack_greedy(const Game& game);
 
 } // namespace cyborg::search
 

@@ -12,11 +12,16 @@ set(cyborgUprising_SOURCES
   search.cpp
   main.cpp)
 
+set(typelist_DIR
+  /home/jfa/projects/typelist)
+
 ######################
 # Executable targets #
 ######################
 add_compile_options( -Wall -Wextra -pedantic -std=c++17 )
 add_executable( main ${cyborgUprising_SOURCES} )
+target_include_directories( main PUBLIC
+  typelist_DIR)
 #target_include_directories( main PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} )
 
 #####################
