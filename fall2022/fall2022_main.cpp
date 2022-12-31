@@ -10,6 +10,7 @@
 #include <limits>
 #include <memory>
 #include <numeric>
+#include <random>
 #include <set>
 #include <sstream>
 #include <string>
@@ -48,18 +49,18 @@ struct Point {
         std::vector<Point> neighbours;
         const std::array<Point, 4> candidates{
                 Point{    x, y - 1},
-                Point{x - 1,                      y},
-                Point{x + 1,                      y},
+                Point{x - 1,     y},
+                Point{x + 1,     y},
                 Point{    x, y + 1}
         };
         std::copy_if(candidates.begin(), candidates.end(),
-                     std::back_inserter(neighbours), [&](const Point& p){ return in_bounds(p); });
+                     std::back_inserter(neighbours),
+                     [&](const Point& p) { return in_bounds(p); });
         return neighbours;
     }
 
     [[nodiscard]] bool in_bounds(const Point& p) const {
-        return p.x >= 0 && p.y >= 0 && p.x < game_width
-               && p.y < game_height;
+        return p.x >= 0 && p.y >= 0 && p.x < game_width && p.y < game_height;
     }
 
     operator size_t() const { return x + y * game_width; }
@@ -244,11 +245,10 @@ class BFS {
 
   public:
     explicit BFS(Game& game)
-        : game{game}
-  {
-    dirty.resize(size, true);
-    distances.resize(size);
-  }
+        : game{game} {
+        dirty.resize(size, true);
+        distances.resize(size);
+    }
 
     void set_all_dirty() { std::fill_n(dirty.begin(), size, true); }
 
@@ -357,7 +357,7 @@ struct Agent {
     template <typename TileContainer, typename OtherTileContainer>
     std::vector<std::pair<const Tile*, double>>
             avg_target_distance(const TileContainer& sources,
-                              const OtherTileContainer& targets) {
+                                const OtherTileContainer& targets) {
 
         const auto avg_distance = [&](double total_targets_units) {
             return [&, total = total_targets_units](const Tile* const& source) {
@@ -378,12 +378,16 @@ struct Agent {
                                 });
 
         std::vector<std::pair<const Tile*, double>> result;
-        std::transform(
-                sources.begin(), sources.end(), std::back_inserter(result),
-                [&, avg_distance = avg_distance(total_target_units)](
-                        const Tile* const& source) {
-                    return std::make_pair(source, avg_distance(source));
-                });
+
+        if (total_target_units == 0) {
+            return result;
+        }
+        std::transform(sources.begin(), sources.end(),
+                       std::back_inserter(result),
+                       [&, avg_distance = avg_distance(total_target_units)](
+                               const Tile* const& source) {
+                           return std::make_pair(source, avg_distance(source));
+                       });
 
         return result;
     }
@@ -406,6 +410,10 @@ struct Agent {
         };
 
         std::vector<std::pair<const Tile*, const Tile*>> result;
+
+        if (targets.empty()) {
+            return result;
+        }
 
         std::transform(sources.begin(), sources.end(),
                        std::back_inserter(result),
@@ -433,25 +441,39 @@ struct Agent {
         if (nb_resource > 0) {
             // Find the point on the boundary with the smallest average
             // distance to enemies and spawn all there
-            auto avg_distance =
-                    avg_target_distance(my_inner_bdry, game.opp_units);
-            const Tile* hottest_bdry_tile =
-                    std::min_element(avg_distance.begin(), avg_distance.end(),
-                                     [](const auto& a, const auto& b) {
-                                         return a.second < b.second;
-                                     })
-                            ->first;
+            if (my_inner_bdry.empty()) {
+                spawn_actions.emplace_back(std::make_tuple(
+                        nb_resource,
+                        game.my_tiles[rand() % game.my_tiles.size()]));
+            } else if (game.opp_units.empty()) {
+                spawn_actions.emplace_back(
+                        std::make_tuple(nb_resource, *my_inner_bdry.cbegin()));
+            } else {
 
-            spawn_actions.emplace_back(
-                    std::make_tuple(nb_resource, hottest_bdry_tile));
+                auto avg_distance =
+                        avg_target_distance(my_inner_bdry, game.opp_units);
+
+                auto hottest_bdry_tile =
+                        std::min_element(avg_distance.begin(),
+                                         avg_distance.end(),
+                                         [](const auto& a, const auto& b) {
+                                             return a.second < b.second;
+                                         })
+                                ->first;
+                spawn_actions.emplace_back(
+                        std::make_tuple(nb_resource, hottest_bdry_tile));
+            }
         }
 
         // MOVES
         {
-            auto min_distance = closest_target(game.my_units, my_outer_bdry);
-            for (const auto& [source, target] : min_distance) {
-                move_actions.emplace_back(
-                        std::make_tuple(source->units, source, target));
+            if (!my_outer_bdry.empty()) {
+                auto min_distance =
+                        closest_target(game.my_units, my_outer_bdry);
+                for (const auto& [source, target] : min_distance) {
+                    move_actions.emplace_back(
+                            std::make_tuple(source->units, source, target));
+                }
             }
         }
 
@@ -499,6 +521,10 @@ struct Agent {
         my_outer_bdry.clear();
 
         for (const auto* tile : game.my_tiles) {
+            if (!tile->walkable()) {
+                continue;
+            }
+
             buffer.clear();
             game.neighbours(*tile, std::back_inserter(buffer));
 
@@ -533,9 +559,9 @@ int main() {
                 cout << "WAIT" << endl;
             } else {
 
-              std::copy(actions.begin(), actions.end(),
-                        std::ostream_iterator<std::string>{cout, ";"});
-              cout << endl;
+                std::copy(actions.begin(), actions.end(),
+                          std::ostream_iterator<std::string>{cout, ";"});
+                cout << endl;
             }
         }
     } catch (std::exception& e) {
