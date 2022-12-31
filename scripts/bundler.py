@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
 """
-With the first given argument as SRC_DIR,
-concatenate all of SRC_DIR/<filename> where
-<filename> is any file listed in SRC_DIR/sources.txt
+USAGE:
+
+In a file `sources.txt`, list each source file needed to build your main
+ (including any header files).
+Note: If `sources.txt` is found in directory `DIR`, then all those files must also
+ be there.
+
+Executing this script with `DIR` as its only argument will produce a valid, single file called
+main_bundled.cpp which can then be submitted on CodinGame.
 """
 
 import sys
@@ -20,17 +26,19 @@ optim_header = """
 """
 
 
-def run(sources_fn, output_fn):
-
-    with open(sources_fn) as sources:
-        files = list(map(lambda src: source_dir / src.strip(), sources.readlines()))
+def run(src_dir, output_fn):
+    """Read and concat all files found in src_dir/sources.txt"""
+    with open(src_dir / "sources.txt", "r") as sources:
+        files = list(map(lambda src: sources_dir / src.strip(),
+                         sources.readlines()))
 
     with open(output_fn, "w+") as out:
         out.write(optim_header)
         for file in files:
-            with open(file) as f:
-                for line in f.readlines():
-                    if line.startswith('#include "'): continue
+            with open(file, encoding="utf8") as file:
+                for line in file.readlines():
+                    if line.startswith('#include "'):
+                        continue
                     out.write(line)
                 out.write('\n')
 
@@ -38,13 +46,11 @@ def run(sources_fn, output_fn):
 if __name__ == '__main__':
     if len(sys.argv) < 2:
         print(f"USAGE: {sys.argv[0]} SOURCES_DIRECTORY")
-        exit(1)
+        sys.exit(1)
 
-    home_dir = Path.home()
-    project_dir = home_dir / 'projects/CodinGame'
-    source_dir = project_dir / sys.argv[1]
-    sources = source_dir / 'sources.txt'
-    output = source_dir / 'build/main_bundled.cpp'
+    sources_file = Path(sys.argv[1])
+    sources_dir = sources_file.parent
+    output = sources_dir / 'build/main_bundled.cpp'
 
-    run(sources, output)
-    exit(0)
+    run(sources_dir, output)
+    sys.exit(0)
