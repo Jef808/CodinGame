@@ -8,7 +8,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED 17)
 
 set( scripts_DIR ${CMAKE_SOURCE_DIR}/scripts )
 
-add_subdirectory(fall2022)
+# add_subdirectory(fall2022)
+add_subdirectory(platinumRift)
+add_subdirectory(deathfirstsearch1)
 
 # add_custom_target(main_bundled
 #   "./${scripts_DIR}/bundler.py ${scripts_DIR}/sources.txt"
