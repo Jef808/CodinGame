@@ -26,11 +26,11 @@ class World {
      */
     World();
 
-    [[nodiscard]] int width() const { return m_width; }
+    [[nodiscard]] unsigned long width() const { return m_width; }
 
-    [[nodiscard]] int height() const { return m_height; }
+    [[nodiscard]] unsigned long height() const { return m_height; }
 
-    [[nodiscard]] Tile tile(int idx) const { return m_tiles[idx]; }
+    [[nodiscard]] Tile tile(unsigned long idx) const { return m_tiles[idx]; }
 
     [[nodiscard]] Tile tile(int row, int col) const {
         return m_tiles[get_idx(row, col)];
@@ -38,8 +38,7 @@ class World {
 
     const Tile& update_tile(int row, int col);
 
-    template<typename T=int>
-    [[nodiscard]] typename std::vector<T>::size_type get_idx(int row, int col) const {
+    [[nodiscard]] unsigned long get_idx(int row, int col) const {
         return col + row * m_width;
     }
 

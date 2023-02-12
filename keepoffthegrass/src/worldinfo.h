@@ -22,6 +22,7 @@ class WorldInfo {
      */
     void update();
 
+    [[nodiscard]] const World world() const { return m_world; }
     [[nodiscard]] const int my_matter() const { return m_my_matter; }
     [[nodiscard]] const int opp_matter() const { return m_opp_matter; }
     [[nodiscard]] const std::vector<std::reference_wrapper<const Tile>>& my_tiles() const { return m_my_tiles; }

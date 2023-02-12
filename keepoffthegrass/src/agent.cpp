@@ -10,8 +10,9 @@ using namespace std;
 ostream& operator<<(ostream&, const Tile&);
 
 void Agent::choose_actions(const WorldInfo& worldinfo) {
-    for (auto _tile : worldinfo.my_tiles()) {
-      const Tile& tile = _tile.get();
+
+
+    for (const Tile& tile : worldinfo.my_tiles()) {
         if (tile.can_spawn) {
             int amount = 0; // TODO: pick amount of robots to spawn here
             if (amount > 0) {
