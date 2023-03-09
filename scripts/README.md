@@ -5,13 +5,15 @@
 Include a *sources.txt* file alongside each subdirectory to specify which files will be included in the bundle.
 For example, if the root directory has the form
 
-``` 
+```
 Root
-├── subproject
+├── CMakeLists.txt
+├── ...
+├── subProject
 |   ├── CMakeLists.txt
 |   ├── sources.txt
 │   ├── helpers.h
-│   ├── helpers.cpp 
+│   ├── helpers.cpp
 │   └── main.cpp
 | ...
 ```
@@ -23,7 +25,7 @@ helpers.cpp
 main.cpp
 ```
 
-## Cmake integration 
+## Cmake integration
 
 Continuing with the above examle, suppose the subdirectory's *CMakeLists.txt* file defines the main target as
 
@@ -43,6 +45,18 @@ add_custom_target(main_bundled
   COMMENT "Bundled all the .h and .cpp files into one for submission on the CodinGame website"
 )
 ```
-    
-This ensures that a *main_bundled.cpp* file automatically gets compiled from the sources declared in *sources.txt* every time the subproject is built (e.g. via *cmake --build <build-directory>*).
 
+Now in the root's *CMakeLists.txt*, we simply add a line
+
+``` cmake
+add_subdirectory(subProject)
+```
+    
+ and running the usual
+ 
+ ```bash
+cmake -S . -B build
+cmake --build build
+ ```
+
+will create a *main_bundled.cpp* file in *Root/build/subProject*

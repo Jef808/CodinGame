@@ -9,11 +9,16 @@ Note: If `sources.txt` is found in directory `DIR`, then all those files must al
 
 Executing this script with `DIR` as its only argument will produce a valid, single file called
 main_bundled.cpp which can then be submitted on CodinGame.
+
+By executing this script with argument '-d DIR -o FILENAME', the output file in directory 'DIR' will be named 'FILENAME.txt'.
 """
 
-import sys
+import argparse
 from pathlib import Path
+from os import access, R_OK, W_OK, X_OK
+from sys import stderr
 
+declare_online = "#define _ONLINE\n\n"
 
 optim_header = """
 #undef _GLIBCXX_DEBUG // disable run-time bound checking, etc
@@ -26,14 +31,118 @@ optim_header = """
 """
 
 
-def run(src_dir, output_fn):
-    """Read and concat all files found in src_dir/sources.txt"""
-    with open(src_dir / "sources.txt", "r") as sources:
-        files = list(map(lambda src: sources_dir / src.strip(),
-                         sources.readlines()))
+class PathType(object):
+    def __init__(self, exists=True, type='file', permissions=[]):
+        assert exists in (True, False, None)
+        assert type in ('file', 'dir', None) or hasattr(type, '__call__')
+        assert all(perm in ('R_OK', 'W_OK', 'X_OK') for perm in permissions)
 
-    with open(output_fn, "w+") as out:
+        self._exists = exists
+        self._type = type
+        self._permissions = permissions
+
+    def _validate_type(self, string: str):
+        prospective_path = Path(string)
+        if self._type is None:
+            return
+        elif self._type == 'file':
+            if not prospective_path.is_file():
+                raise argparse.ArgumentError(
+                    f"path_type: {prospective_path} is not a valid file")
+        elif self._type == 'dir':
+            if not prospective_path.is_dir():
+                raise argparse.ArgumentError(
+                    f"path_type: {prospective_path} is not a valid directory")
+
+    def _validate_permissions(self, string: str):
+        prospective_path = Path(string)
+        if 'R_OK' in self._permissions:
+            if not access(prospective_path, R_OK):
+                raise argparse.ArgumentError(
+                    f"writable_dir: {prospective_path} is not readable")
+        if 'W_OK' in self._permissions:
+            if not access(prospective_path, W_OK):
+                raise argparse.ArgumentError(
+                    f"writable_dir: {prospective_path} is not writable")
+        if 'X_OK' in self._permissions:
+            if not access(prospective_path, X_OK):
+                raise argparse.ArgumentError(
+                    f"writable_dir: {prospective_path} is not executable")
+
+    def _validate_existence(self, string: str):
+        prospective_path = Path(string)
+        if self._exists is not None:
+            if self._exists:
+                if not prospective_path.exists():
+                    raise argparse.ArgumentError(
+                        f"path_type: {prospective_path} does not exists")
+            elif prospective_path.exists():
+                raise argparse.ArgumentError(
+                    f"path_type: {prospective_path} already exists")
+
+    def __call__(self, string: str):
+        self._validate_existence(string)
+        self._validate_type(string)
+        self._validate_permissions(string)
+        return string
+
+
+class SourcesDir(PathType):
+    def __init__(self):
+        super().__init__(type='dir', exists=True)
+
+    def __call__(self, string: str):
+        super().__call__(string)
+        sources_dir = Path(string)
+        sources_file = sources_dir / "sources.txt"
+        if not (sources_dir.is_dir()):
+            raise argparse.ArgumentError(
+                f"sources_dir: {sources_dir} is not a valid directory")
+        if not (sources_file.is_file() or not access(sources_file, R_OK)):
+            raise argparse.ArgumentError(
+                f"sources_dir: {sources_file} is not a valid readable file")
+        return string
+
+
+parser = argparse.ArgumentParser(
+                    description="Bundles a collection of headers and sources "
+                                "into one .cpp file")
+
+parser.add_argument(
+    '-d', '--directory',
+    help='output directory',
+    action='store',
+    type=PathType(exists=True,
+                  type='dir',
+                  permissions=['W_OK']),
+    default='./build/bin',
+    dest='output_directory')
+
+parser.add_argument(
+    '-o', '--output',
+    help='output filename',
+    action='store',
+    default='main_bundled',
+    dest='output_filename')
+
+parser.add_argument(
+    '-s', '--sources',
+    help='directory containing the sources.txt file',
+    action='store',
+    type=SourcesDir(),
+    default=None,
+    dest='sources_dir')
+
+
+def main(sources: Path, output_filepath: Path):
+    """Read and concat all files found in src_dir/sources.txt"""
+    dir = sources.parent
+    with open(sources, "r") as sources:
+        files = list(map(lambda source: dir / source.strip(),
+                         sources.readlines()))
+    with open(output_filepath, "w+") as out:
         out.write(optim_header)
+        out.write(declare_online)
         for file in files:
             with open(file, encoding="utf8") as file:
                 for line in file.readlines():
@@ -44,13 +153,12 @@ def run(src_dir, output_fn):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        print(f"USAGE: {sys.argv[0]} SOURCES_DIRECTORY")
-        sys.exit(1)
-
-    sources_file = Path(sys.argv[1])
-    sources_dir = sources_file.parent
-    output = sources_dir / 'build/main_bundled.cpp'
-
-    run(sources_dir, output)
-    sys.exit(0)
+    args = parser.parse_args()
+    print(args, file=stderr)
+    sources_dir = (Path.cwd() if args.sources_dir is None
+                   else Path(args.sources_dir))
+    sources = sources_dir / "sources.txt"
+    output = Path(args.output_directory) / args.output_filename
+    if not output.suffix:
+        output = output.with_suffix(".cpp")
+    main(sources, output)
