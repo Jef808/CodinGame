@@ -2,23 +2,14 @@
 """
 USAGE:
 
-In a file `sources.txt`, list each source file needed to build your main
- (including any header files).
-Note: If `sources.txt` is found in directory `DIR`, then all those files must also
- be there.
-
-Executing this script with `DIR` as its only argument will produce a valid, single file called
-main_bundled.cpp which can then be submitted on CodinGame.
-
-By executing this script with argument '-d DIR -o FILENAME', the output file in directory 'DIR' will be named 'FILENAME.txt'.
+See __file__ --help.
 """
 
 import argparse
 from pathlib import Path
 from os import access, R_OK, W_OK, X_OK
-from sys import stderr
 
-declare_online = "#define _ONLINE\n\n"
+offline_header = "#define _OFFLINE\n\n"
 
 optim_header = """
 #undef _GLIBCXX_DEBUG // disable run-time bound checking, etc
@@ -109,7 +100,7 @@ parser = argparse.ArgumentParser(
                                 "into one .cpp file")
 
 parser.add_argument(
-    '-d', '--directory',
+    '-d',
     help='output directory',
     action='store',
     type=PathType(exists=True,
@@ -119,22 +110,27 @@ parser.add_argument(
     dest='output_directory')
 
 parser.add_argument(
-    '-o', '--output',
+    '-o',
     help='output filename',
     action='store',
     default='main_bundled',
     dest='output_filename')
 
 parser.add_argument(
-    '-s', '--sources',
+    '-s',
     help='directory containing the sources.txt file',
     action='store',
     type=SourcesDir(),
     default=None,
     dest='sources_dir')
 
+parser.add_argument(
+    '--offline',
+    help='flag indicating that the output is for offline use',
+    action='store_true')
 
-def main(sources: Path, output_filepath: Path):
+
+def main(sources: Path, output_filepath: Path, offline: bool):
     """Read and concat all files found in src_dir/sources.txt"""
     dir = sources.parent
     with open(sources, "r") as sources:
@@ -142,7 +138,8 @@ def main(sources: Path, output_filepath: Path):
                          sources.readlines()))
     with open(output_filepath, "w+") as out:
         out.write(optim_header)
-        out.write(declare_online)
+        if offline:
+            out.write(offline_header)
         for file in files:
             with open(file, encoding="utf8") as file:
                 for line in file.readlines():
@@ -154,11 +151,10 @@ def main(sources: Path, output_filepath: Path):
 
 if __name__ == '__main__':
     args = parser.parse_args()
-    print(args, file=stderr)
     sources_dir = (Path.cwd() if args.sources_dir is None
                    else Path(args.sources_dir))
     sources = sources_dir / "sources.txt"
     output = Path(args.output_directory) / args.output_filename
     if not output.suffix:
         output = output.with_suffix(".cpp")
-    main(sources, output)
+    main(sources, output, args.offline)
