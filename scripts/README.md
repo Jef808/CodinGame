@@ -1,6 +1,8 @@
-# Bundler.py
+# Utility scripts
 
-## Specifying sources
+## Bundler.py
+
+### Specifying sources
 
 Include a *sources.txt* file alongside each subdirectory to specify which files will be included in the bundle.
 For example, if the root directory has the form
@@ -25,7 +27,7 @@ helpers.cpp
 main.cpp
 ```
 
-## Cmake integration
+### Cmake integration
 
 Continuing with the above example, suppose the subdirectory's *CMakeLists.txt* file defines the main target as
 
