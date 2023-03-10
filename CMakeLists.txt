@@ -1,5 +1,7 @@
-project( CodinGame )
 cmake_minimum_required(VERSION 3.22)
+project(
+  CodinGame
+  HOMEPAGE_URL https://github.com/Jef808/CodinGame/)
 
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -8,6 +10,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED 17)
 
 set( scripts_DIR ${CMAKE_SOURCE_DIR}/scripts )
 
+project(EscapeTheCat)
 add_subdirectory(escapethecat)
 
 # add_subdirectory(fall2022)
