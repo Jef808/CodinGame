@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""
-USAGE:
-
-See __file__ --help.
-"""
+"""See __file__ --help."""
 
 import argparse
 from pathlib import Path
@@ -11,10 +7,10 @@ from os import access, R_OK, W_OK, X_OK
 
 offline_header = "#define _OFFLINE\n\n"
 
-optim_header = """
-#undef _GLIBCXX_DEBUG // disable run-time bound checking, etc
-#pragma GCC optimize("Ofast,inline") // Ofast = O3,fast-math,allow-store-data-races,no-protect-parens
-
+optim_header = """#undef _GLIBCXX_DEBUG // disable run-time bound checking, etc
+#pragma GCC optimize("Ofast,inline") // Ofast = O3,fast-math,
+                                     // allow-store-data-races,
+                                     // no-protect-parens
 #pragma GCC target("bmi,bmi2,lzcnt,popcnt") // bit manipulation
 #pragma GCC target("movbe") // byte swap
 #pragma GCC target("aes,pclmul,rdrnd") // encryption
@@ -23,7 +19,10 @@ optim_header = """
 
 
 class PathType(object):
+    """PathType."""
+
     def __init__(self, exists=True, type='file', permissions=[]):
+        """Init."""
         assert exists in (True, False, None)
         assert type in ('file', 'dir', None) or hasattr(type, '__call__')
         assert all(perm in ('R_OK', 'W_OK', 'X_OK') for perm in permissions)
@@ -72,6 +71,7 @@ class PathType(object):
                     f"path_type: {prospective_path} already exists")
 
     def __call__(self, string: str):
+        """Call."""
         self._validate_existence(string)
         self._validate_type(string)
         self._validate_permissions(string)
@@ -79,10 +79,14 @@ class PathType(object):
 
 
 class SourcesDir(PathType):
+    """SourcesDir."""
+
     def __init__(self):
+        """Init."""
         super().__init__(type='dir', exists=True)
 
     def __call__(self, string: str):
+        """Call."""
         super().__call__(string)
         sources_dir = Path(string)
         sources_file = sources_dir / "sources.txt"
@@ -131,7 +135,7 @@ parser.add_argument(
 
 
 def main(sources: Path, output_filepath: Path, offline: bool):
-    """Read and concat all files found in src_dir/sources.txt"""
+    """Read and concat all files found in src_dir/sources.txt."""
     dir = sources.parent
     with open(sources, "r") as sources:
         files = list(map(lambda source: dir / source.strip(),
