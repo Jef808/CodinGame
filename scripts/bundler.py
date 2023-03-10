@@ -156,9 +156,9 @@ def main(sources: Path, output_filepath: Path, offline: bool):
 if __name__ == '__main__':
     args = parser.parse_args()
     sources_dir = (Path.cwd() if args.sources_dir is None
-                   else Path(args.sources_dir))
+                   else Path(args.sources_dir).absolute())
     sources = sources_dir / "sources.txt"
-    output = Path(args.output_directory) / args.output_filename
+    output = Path(args.output_directory).absolute() / args.output_filename
     if not output.suffix:
         output = output.with_suffix(".cpp")
     main(sources, output, args.offline)

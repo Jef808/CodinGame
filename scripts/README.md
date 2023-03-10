@@ -36,13 +36,14 @@ add_executable(main main.cpp someHeader.cpp)
 Then we define a custom target by adding
 
 ``` cmake
-add_custom_target(main_bundled
+find_package(Python3 COMPONENTS Interpreter Development)
+
+add_custom_target(escape_the_cat_bundled
   ALL
-  COMMAND ${scripts_DIR}/bundler.py ${CMAKE_CURRENT_SOURCE_DIR}/sources.txt
-  DEPENDS main
-  BYPRODUCTS "{CMAKE_CURRENT_BINARY_DIR}/main_bundled.cpp"
-  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-  COMMENT "Bundled all the .h and .cpp files into one for submission on the CodinGame website"
+  COMMAND ${Python3_EXECUTABLE} ${scripts_DIR}/bundler.py -s ${CMAKE_CURRENT_SOURCE_DIR} -o escapethecat_bundled -d ${CMAKE_CURRENT_BINARY_DIR}
+  DEPENDS escape_the_cat
+  BYPRODUCTS "{CMAKE_CURRENT_BINARY_DIR}/escape_the_cat_bundled.cpp"
+  COMMENT "Running ${Python3_EXECUTABLE} ${scripts_DIR}/bundler.py -s ${CMAKE_CURRENT_SOURCE_DIR} -o escapethecat_bundled -d ${CMAKE_CURRENT_BINARY_DIR}"
 )
 ```
 
