@@ -27,10 +27,10 @@ main.cpp
 
 ## Cmake integration
 
-Continuing with the above examle, suppose the subdirectory's *CMakeLists.txt* file defines the main target as
+Continuing with the above example, suppose the subdirectory's *CMakeLists.txt* file defines the main target as
 
 ``` cmake
-add_executable(main main.cpp someHeader.cpp)
+add_executable(${CMAKE_PROJECT_NAME}_main main.cpp someHeader.cpp)
 ```
 
 Then we define a custom target by adding
@@ -38,26 +38,30 @@ Then we define a custom target by adding
 ``` cmake
 find_package(Python3 COMPONENTS Interpreter Development)
 
-add_custom_target(escape_the_cat_bundled
+add_custom_target(${CMAKE_PROJECT_NAME}_bundled
   ALL
-  COMMAND ${Python3_EXECUTABLE} ${scripts_DIR}/bundler.py -s ${CMAKE_CURRENT_SOURCE_DIR} -o escapethecat_bundled -d ${CMAKE_CURRENT_BINARY_DIR}
-  DEPENDS escape_the_cat
-  BYPRODUCTS "{CMAKE_CURRENT_BINARY_DIR}/escape_the_cat_bundled.cpp"
-  COMMENT "Running ${Python3_EXECUTABLE} ${scripts_DIR}/bundler.py -s ${CMAKE_CURRENT_SOURCE_DIR} -o escapethecat_bundled -d ${CMAKE_CURRENT_BINARY_DIR}"
+  COMMAND ${Python3_EXECUTABLE} ${scripts_DIR}/bundler.py -s ${CMAKE_CURRENT_SOURCE_DIR} -o ${CMAKE_PROJECT_NAME}_bundled -d ${CMAKE_CURRENT_BINARY_DIR}
+  DEPENDS ${CMAKE_PROJECT_NAME}_main
+  BYPRODUCTS "{CMAKE_CURRENT_BINARY_DIR}/${CMAKE_PROJECT_NAME}_bundled.cpp"
+  COMMENT "Running ${Python3_EXECUTABLE} ${scripts_DIR}/bundler.py -s ${CMAKE_CURRENT_SOURCE_DIR} -o ${CMAKE_PROJECT_NAME}_bundled -d ${CMAKE_CURRENT_BINARY_DIR}"
 )
 ```
 
-Now in the root's *CMakeLists.txt*, we simply add a line
+Now in the root's *CMakeLists.txt*, we simply add
 
 ``` cmake
+project(subProject)
 add_subdirectory(subProject)
 ```
     
- and running the usual
+(notice the usage of the CMAKE_PROJECT_NAME in the subproject's *CMakeLists.txt* file).
+Now, running the usual
  
  ```bash
 cmake -S . -B build
 cmake --build build
  ```
 
-will create a *main_bundled.cpp* file in *Root/build/subProject*
+a the root directory will create a *subProject_bundled.cpp* file in the *Root/build/subProject/* directory.
+
+See the *example* directory for the above example.
