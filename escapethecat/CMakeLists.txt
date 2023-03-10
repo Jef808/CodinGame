@@ -9,9 +9,8 @@ find_package(Python3 COMPONENTS Interpreter Development)
 
 add_custom_target(escape_the_cat_bundled
   ALL
-  COMMAND "${Python3_EXECUTABLE} ${scripts_DIR}/bundler.py ${CMAKE_CURRENT_SOURCE_DIR}/sources.txt"
+  COMMAND ${Python3_EXECUTABLE} ${scripts_DIR}/bundler.py -s ${CMAKE_CURRENT_SOURCE_DIR} -o escapethecat_bundled -d ${CMAKE_CURRENT_BINARY_DIR}
   DEPENDS escape_the_cat
   BYPRODUCTS "{CMAKE_CURRENT_BINARY_DIR}/escape_the_cat_bundled.cpp"
-  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-  COMMENT "Bundled all the .h and .cpp files into one for submission on the CodinGame website"
+  COMMENT "Running ${Python3_EXECUTABLE} ${scripts_DIR}/bundler.py -s ${CMAKE_CURRENT_SOURCE_DIR} -o escapethecat_bundled -d ${CMAKE_CURRENT_BINARY_DIR}"
 )
