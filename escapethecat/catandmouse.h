@@ -21,13 +21,14 @@ class CatAndMouse {
    * \brief Compute a number between \f$0\f$ and \f$1\f$ indicating the
    * distance from the cat to the mouse's closest point on the boundary.
    *
-   * This computes the score of a position solely in terms of the distance
-   * the cat needs to cover to reach its destination.
    * More precisely, with \f$C, M\f$ denoting the cat's (resp. mouse's) position,
    * \f$\partial M\f$ the point closest to the mouse
    * on the boundary, and \f$d_{\partial}(\cdot, \cdot)\f$
    * the distance restricted to the boundary of the pool,
-   * compute \f[\frac{1}{\pi R}d_{\partial}(C, \partial M)\f]
+   * compute
+   * \f[
+   *   \frac{1}{\pi R}d_{\partial}(C, \partial M) + \frac{1}{R}d(0, M)
+   * \f]
    * where \f$R\f$ is the radius of the pool.
    *
    * \return A number between 0 and 1.
