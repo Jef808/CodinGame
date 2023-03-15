@@ -3,12 +3,17 @@ project(
   CodinGame
   HOMEPAGE_URL https://github.com/Jef808/CodinGame/)
 
-
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED 17)
 
-set( scripts_DIR ${CMAKE_SOURCE_DIR}/scripts )
+set(scripts_DIR ${CMAKE_SOURCE_DIR}/scripts)
+
+include(Catch2)
+list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
+include(CTest)
+include(Catch)
 
 project(EscapeTheCat)
 add_subdirectory(escapethecat)

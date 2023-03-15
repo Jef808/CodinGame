@@ -1,12 +1,13 @@
+# include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
-link_directories(${CMAKE_CURRENT_SOURCE_DIR})
-
-add_library(${CMAKE_PROJECT_NAME}_LIB entities.cpp)
+add_library(${CMAKE_PROJECT_NAME}_LIB catandmouse.cpp)
 
 add_executable(${CMAKE_PROJECT_NAME}_MAIN main.cpp)
 target_link_libraries(${CMAKE_PROJECT_NAME}_MAIN PRIVATE ${CMAKE_PROJECT_NAME}_LIB)
 
 find_package(Python3 COMPONENTS Interpreter Development)
+
+add_subdirectory(tests)
 
 add_custom_target(${CMAKE_PROJECT_NAME}_bundled
   ALL
