@@ -30,7 +30,7 @@ class CatAndMouse {
      *
      * \return A number between 0 and 1.
      */
-    double score() const;
+    [[nodiscard]] double score() const;
 
     /**
      * Update the mouse's and cat's position after mouse moves towards \p
@@ -65,7 +65,6 @@ class CatAndMouse {
     std::complex<double> m_cat_prev{POOL_RADIUS, 0.0};
     std::complex<double> m_mouse{0.0, 0.0};
     std::complex<double> m_mouse_prev{0.0, 0.0};
-    mutable std::complex<double> m_mouse_boundary{0.0 - POOL_RADIUS};
 };
 
 extern CatAndMouse initialize(std::istream&);
