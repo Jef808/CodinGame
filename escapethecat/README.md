@@ -13,8 +13,8 @@ Our solution goes as follows.
 First, head towards the center.
 Once the mouse is close to the center, at each turn we choose the direction on $\partial B(M, 10)$ which maximimizes our <a>score function<\a>
 
-$$\sigma(p_1, p_2) = R/p_1 + p_2 / \pi \in [0, 2].$$
+$$\sigma(p_1, p_2) = p_1 / R + p_2 / \pi \in [0, 2].$$
 
-The $p_2 / \pi$ term prioritizes directions which delay the cat as much as possible, while the $R/p_1$ term prioritizes directions closer to the boundary.
+The $p_2 / \pi$ term prioritizes directions which delay the cat as much as possible, while the $p_1 / R$ term prioritizes directions closer to the boundary.
 I was expecting to have to associate weights to those two terms, possibly depending on $p_1$ and $p_2$, but their sum ended up being sufficient to solve all test cases. 
 
