@@ -11,7 +11,7 @@ where $R$ is the radius of the pool and $\theta(a, b)$ denotes the angle formed 
 
 Our solution goes as follows.
 First, head towards the center.
-Once the mouse is close to the center, at each turn we choose the direction on $\partial B(M, 10)$ which maximimizes our <a>score function</a>
+Once the mouse is close to the center, at each turn we choose the direction on $\partial B(M, 10)$ which maximimizes our <em>score function</em>
 
 $$\sigma(p_1, p_2) = p_1 / R + p_2 / \pi \in [0, 2].$$
 
