@@ -18,6 +18,12 @@ include(Catch)
 project(EscapeTheCat)
 add_subdirectory(escapethecat)
 
+project(DontPanic)
+add_subdirectory(dontpanic)
+
+project(TowerDereference)
+add_subdirectory(tower-dereference)
+
 # add_subdirectory(fall2022)
 #add_subdirectory(platinumRift)
 #add_subdirectory(deathfirstsearch1)
