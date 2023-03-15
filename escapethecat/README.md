@@ -1,6 +1,6 @@
 # Escape The Cat
 
-This is a solution for the Escape The Cat puzzle found [URL](https://www.codingame.com/training/medium/escaping-the-cat "here").
+This is a solution for the Escape The Cat puzzle found [here](https://www.codingame.com/training/medium/escaping-the-cat "Escape The Cat").
 
 By rotating and reflecting as needed, any position can be normalized so that the mouse lies on the x-axis with $x > 0$ and so that the cat lies in the upper half-plane.
 From that point of view, it is clear that the evaluation of a position can be reduced to a function of two parameters. Namely, with $C$ and $M$ respectively denoting the cat's position and the mouse's position, let 
