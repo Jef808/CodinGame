@@ -4,7 +4,7 @@
 
 ### Specifying sources
 
-Include a *sources.txt* file alongside each subdirectory to specify which files will be included in the bundle.
+Include a **sources.txt** file alongside each subdirectory to specify which files will be included in the bundle.
 For example, if the root directory has the form
 
 ```
@@ -66,4 +66,4 @@ cmake --build build
 
 a the root directory will create a *subProject_bundled.cpp* file in the *Root/build/subProject/* directory.
 
-See the *example* directory for the above example.
+See the directory *./example/bundler/* for the above example.
