@@ -7,7 +7,7 @@ From that point of view, it is clear that the evaluation of a position can be re
 $$p_1 = d(0, M) \in [0, R]$$
 and
 $$p_2 = \theta(M, C) \in [0, \pi]$$
-where $R$ is the radius of the pool and $\theta(a, b)$ denotes the angle formed at the origin by the two vectors $a$ and $b$ of the upper half-plane.
+where $R$ is the radius of the pool and $\theta(a, b)$ denotes the angle formed at the origin by the two vectors $a$ and $b$.
 
 Our solution goes as follows.
 First, head towards the center.
@@ -15,6 +15,6 @@ Once the mouse is close to the center, at each turn we choose the direction on $
 
 $$\sigma(p_1, p_2) = p_1 / R + p_2 / \pi \in [0, 2].$$
 
-The $p_2 / \pi$ term prioritizes directions which delay the cat as much as possible, while the $p_1 / R$ term prioritizes directions closer to the boundary.
+The $p_2 / \pi$ term prioritizes directions which delay the cat, while the $p_1 / R$ term prioritizes directions which bring the mouse closer to the boundary.
 I was expecting to have to associate weights to those two terms, possibly depending on $p_1$ and $p_2$, but their sum ended up being sufficient to solve all test cases. 
 
