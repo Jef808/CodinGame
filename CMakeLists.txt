@@ -10,10 +10,16 @@ set(CMAKE_CXX_STANDARD_REQUIRED 17)
 
 set(scripts_DIR ${CMAKE_SOURCE_DIR}/scripts)
 
+# Test framework
 include(Catch2)
-list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
+list(APPEND CMAKE_MODULE_PATH ${Catch2_SOURCE_DIR}/extras)
 include(CTest)
 include(Catch)
+
+# Grid utils
+add_subdirectory(grid)
+add_library(CG INTERFACE grid/grid.h grid/bfs.h)
+target_include_directories(CG INTERFACE ${CMAKE_SOURCE_DIR})
 
 project(EscapeTheCat)
 add_subdirectory(escapethecat)
@@ -24,10 +30,8 @@ add_subdirectory(dontpanic)
 project(TowerDereference)
 add_subdirectory(tower-dereference)
 
-# add_subdirectory(fall2022)
-#add_subdirectory(platinumRift)
-#add_subdirectory(deathfirstsearch1)
-
+project(KeepOffTheGrass)
+add_subdirectory(kog)
 
 
 # add_custom_target(main_bundled
