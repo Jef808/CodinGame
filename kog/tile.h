@@ -15,6 +15,16 @@ struct Tile {
   bool can_build{ false };
   bool can_spawn{ false };
   bool in_range_of_recycler{ false };
+
+  /**
+   * Check if tile can be used as part of a path.
+   *
+   * \param tile The tile in question.
+   * \param distance The distance of the tile from the start of the path.
+   */
+  [[nodiscard]] bool is_blocked(int distance = 0) const {
+    return recycler || scrap_amount <= (in_range_of_recycler * distance);
+  }
 };
 
 inline std::istream& operator>>(std::istream& stream, Tile& tile) {
@@ -33,16 +43,6 @@ inline std::ostream& operator<<(std::ostream& stream, const Tile& tile) {
                 << "owner = " << tile.owner << '\n'
                 << "units = " << tile.units << '\n'
                 << "recycler = " << tile.recycler;
-}
-
-/**
- * Check if tile can be used as part of a path.
- *
- * \param tile The tile in question.
- * \param distance The distance of the tile from the start of the path.
- */
-inline bool is_traversable(const Tile& tile, double distance = 1.0) {
-  return !tile.recycler && tile.scrap_amount > (tile.in_range_of_recycler * distance);
 }
 
 } // namespace kog

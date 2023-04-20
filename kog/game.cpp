@@ -26,9 +26,22 @@ void Game::initial_input(std::istream& stream) {
 void Game::turn_input(std::istream& stream) {
   stream >> m_me.matter
          >> m_opp.matter;
-  static std::vector<Tile> tiles(m_grid.height() * m_grid.width());
+
+  static std::vector<Tile> tiles = [W=m_grid.width(),H=m_grid.height()]{
+    std::vector<Tile> _tiles(W*H);
+    for (auto y = 0; y < H; ++y) {
+      for (auto x = 0; x < W; ++x) {
+        auto& tile = tiles[x+y*W];
+        tile.x = x;
+        tile.y = y;
+      }
+    }
+    return _tiles;
+  }();
+
   for (auto y = 0; y < m_grid.height(); ++y) {
     for (auto x = 0; x < m_grid.width(); ++x) {
+      auto& tile = tiles[m_grid.index_of(x, y)];
       stream >> tiles[m_grid.index_of(x, y)];
     }
   }

@@ -9,7 +9,7 @@ int main(int argc, char *argv[]) {
   Game game;
   game.initial_input(std::cin);
 
-  Agent agent{&game};
+  Agent agent{game};
 
   for (;;) {
     game.turn_input(std::cin);

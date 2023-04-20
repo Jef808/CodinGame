@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "game.h"
-#include "voronoi_diagram.h"
+#include "grid/voronoi.h"
 
 namespace kog {
 
@@ -21,13 +21,8 @@ class Agent {
   void compute_turn_info();
 
   void debug(std::ostream& stream) const {
-    stream << "My boundary\n";
-    for (auto ndx : m_my_boundary) {
-      stream << ndx << ' ';
-    }
-    stream << std::endl;
-    stream << "Opponent's boundary\n";
-    for (auto ndx : m_opp_boundary) {
+    stream << "Battlefront:\n";
+    for (auto ndx : m_battlefront) {
       stream << ndx << ' ';
     }
     stream << std::endl;
@@ -46,7 +41,7 @@ class Agent {
   std::vector<Index> m_units;
   std::set<Index> m_my_boundary;
   std::set<Index> m_opp_boundary;
-  CG::VoronoiDiagram<Game::Grid> m_units_voronoi;
+  std::vector<CG::VoronoiTileDescriptor<Tile>> m_voronoi;
   std::set<Index> m_battlefront;
 };
 
