@@ -3,25 +3,41 @@
 
 #include "grid/grid.h"
 #include "grid/bfs.h"
+#include "grid/voronoi.h"
+
+#include "helpers.h"
 
 #include <sstream>
 
+using namespace Catch::Matchers;
+
+using namespace CG;
+
 namespace {
 
-enum Tile {
-  F, // Free
-  B  // Blocked
+struct Tile {
+  enum class Type {
+    Free, Blocked
+  };
+  int x;
+  int y;
+  Type type;
+  [[nodiscard]] bool is_blocked(int distance = 0) const {
+    return type == Type::Blocked;
+  }
+  bool operator!=(const Tile& other) const { return type != other.type; }
 };
 
-using Grid = CG::Grid<Tile>;
-using Index = typename Grid::index_type;
+static const Tile F = {0, 0, Tile::Type::Free};    // Free
+static const Tile B = {0, 0, Tile::Type::Blocked}; // Blocked
 
 } // namespace
 
-using namespace Catch::Matchers;
+
+using Index = Grid<Tile>::index_type;
 
 TEST_CASE( "Grid is instantiated correctly", "[grid]" ) {
-  Grid grid{4, 4};
+  Grid<Tile> grid{4, 4};
 
   REQUIRE( grid.width() == 4 );
   REQUIRE( grid.height() == 4 );
@@ -42,46 +58,20 @@ TEST_CASE( "Grid is instantiated correctly", "[grid]" ) {
   }
 
   SECTION( "Tiles get set correctly with the set_tiles method" ) {
-    std::vector<Tile> tiles = {
+    const std::vector<Tile> tiles = {
       B, B, F, F,
       F, F, F, F,
       F, F, F, F,
       F, B, F, F,
     };
     grid.set_tiles(std::vector<Tile>(tiles.begin(), tiles.end()));
-    REQUIRE_THAT( std::vector<Tile>(grid.begin(), grid.end()), Equals(tiles) );
+    REQUIRE_THAT(std::vector<Tile>(grid.begin(), grid.end()), Equals(tiles));
   }
-}
-
-std::string error_msg_distance_fields(int width,
-                                      int height,
-                                      const std::vector<int>& expected,
-                                      const std::vector<int>& actual) {
-  std::stringstream ss;
-  ss << "Expected\n";
-  for (auto y = 0; y < height; ++y) {
-    for (auto x = 0; x < width; ++x) {
-      const auto value = expected[x + width * y];
-      ss << (value == CG::INFTY ? "X " : std::to_string(value))
-         << (0 <= value && value < 10 ? "  " : " ");
-    }
-    ss << '\n';
-  }
-  ss << "\nBut got\n";
-  for (auto y = 0; y < height; ++y) {
-    for (auto x = 0; x < width; ++x) {
-      const auto value = actual[x + width * y];
-      ss << (value == CG::INFTY ? "X " : std::to_string(value))
-         << (0 <= value && value < 10 ? "  " : " ");
-    }
-    ss << '\n';
-  }
-  return ss.str();
 }
 
 
 TEST_CASE( "Bfs gives the correct distance field", "[bfs]" ) {
-  Grid grid;
+  Grid<Tile> grid;
   std::vector<int> distance_field;
 
   SECTION( "On a grid without blocked tiles" ) {
@@ -94,24 +84,24 @@ TEST_CASE( "Bfs gives the correct distance field", "[bfs]" ) {
     grid.set_tiles(std::move(tiles));
 
     SECTION( "From a corner" ) {
-      CG::bfs(grid, 3, distance_field);
+      bfs(grid, 3, distance_field);
       std::vector<int> expected{
         3, 2, 1, 0,
         4, 3, 2, 1,
         5, 4, 3, 2,
       };
-      INFO( error_msg_distance_fields(4, 3, expected, distance_field) );
+      INFO(error_msg_distance_fields(4, 3, distance_field, expected));
       REQUIRE_THAT( distance_field, Equals(expected) );
     }
 
     SECTION( "From a center tile" ) {
-      CG::bfs(grid, 5, distance_field);
+      bfs(grid, 5, distance_field);
       std::vector<int> expected{
         2, 1, 2, 3,
         1, 0, 1, 2,
         2, 1, 2, 3,
       };
-      INFO( error_msg_distance_fields(4, 3, expected, distance_field) );
+      INFO(error_msg_distance_fields(4, 3, distance_field, expected));
       REQUIRE_THAT( distance_field, Equals(expected) );
     }
   }
@@ -129,31 +119,25 @@ TEST_CASE( "Bfs gives the correct distance field", "[bfs]" ) {
     };
     grid.set_tiles(std::move(tiles));
 
-    struct TileBlockedPredicate {
-      const Grid& grid;
-      TileBlockedPredicate(const Grid& grid): grid{grid} {}
-      bool operator()(Index index, int /* distance */) const { return grid.at(index) == Tile::B; }
-    } is_blocked{grid};
-
-    const int B = CG::INFTY;
+    const int X = CG::INT::INFTY;
 
     SECTION( "From an unblocked tile" ) {
-      CG::bfs(grid, 32, distance_field, is_blocked);
+      bfs(grid, 32, distance_field);
       std::vector<int> expected = {
-        B, B, 7, 6, B, 8,
-        8, 7, 6, 5, B, 7,
+        X, X, 7, 6, X, 8,
+        8, 7, 6, 5, X, 7,
         7, 6, 5, 4, 5, 6,
-        8, B, 4, 3, 4, 5,
-        9, B, B, 2, 3, 4,
-        10,B, 0, 1, 2, 3,
-        11,B, 1, 2, 3, 4,
+        8, X, 4, 3, 4, 5,
+        9, X, X, 2, 3, 4,
+        10,X, 0, 1, 2, 3,
+        11,X, 1, 2, 3, 4,
       };
-      INFO( error_msg_distance_fields(6, 7, expected, distance_field) );
+      INFO(error_msg_distance_fields(6, 7, distance_field, expected));
       REQUIRE_THAT( distance_field, Equals(expected) );
     }
 
     SECTION( "From a blocked tile" ) {
-      CG::bfs(grid, 4, distance_field, is_blocked);
+      bfs(grid, 4, distance_field);
       std::vector<int> expected = {
         -1, -1, -1, -1, -1, -1,
         -1, -1, -1, -1, -1, -1,
@@ -163,24 +147,155 @@ TEST_CASE( "Bfs gives the correct distance field", "[bfs]" ) {
         -1, -1, -1, -1, -1, -1,
         -1, -1, -1, -1, -1, -1,
       };
-      INFO( error_msg_distance_fields(6, 7, expected, distance_field) );
+      INFO(error_msg_distance_fields(6, 7, distance_field, expected));
       REQUIRE_THAT( distance_field, Equals(expected) );
     }
 
     SECTION( "From multiple sources" ) {
       std::vector<size_t> sources{ 6, 22 };
-      CG::bfs(grid, sources.begin(), sources.end(), distance_field, is_blocked);
+      bfs(grid, sources.begin(), sources.end(), distance_field);
       std::vector<int> expected = {
-        B, B, 3, 4, B, 4,
-        0, 1, 2, 3, B, 3,
+        X, X, 3, 4, X, 4,
+        0, 1, 2, 3, X, 3,
         1, 2, 3, 2, 1, 2,
-        2, B, 2, 1, 0, 1,
-        3, B, B, 2, 1, 2,
-        4, B, 4, 3, 2, 3,
-        5, B, 5, 4, 3, 4,
+        2, X, 2, 1, 0, 1,
+        3, X, X, 2, 1, 2,
+        4, X, 4, 3, 2, 3,
+        5, X, 5, 4, 3, 4,
       };
-      INFO( error_msg_distance_fields(6, 7, expected, distance_field) );
+      INFO(error_msg_distance_fields(6, 7, distance_field, expected));
       REQUIRE_THAT( distance_field, Equals(expected) );
     }
+  }
+}
+
+TEST_CASE( "Voronoi diagram is generated correctly", "[voronoi]" ) {
+  using Index = Grid<Tile>::index_type;
+
+  const Index width = 6;
+  const Index height = 7;
+  Grid<Tile> grid{width, height};
+
+  std::vector<Tile> tiles = {
+      B, B, F, F, B, F,
+      F, F, F, F, B, F,
+      F, F, F, F, F, F,
+      F, B, F, F, F, F,
+      F, B, B, F, F, F,
+      F, B, F, F, F, F,
+      F, B, F, F, F, F,
+    };
+  grid.set_tiles(std::move(tiles));
+
+  const int X = INT::INFTY;
+  std::vector<CG::VoronoiTileDescriptor<Tile>> voronoi;
+
+  CHECK(grid.width() * grid.height() == 42);
+
+  SECTION( "The first time, with one site" ) {
+    const Grid<Tile>::index_type a = 6;
+    std::vector<Grid<Tile>::index_type> sites{a};
+
+    generate_voronoi_diagram(grid, sites.begin(), sites.end(), voronoi);
+
+    std::vector<VoronoiTileDescriptor<Tile>> expected {
+      {X, { }}, {X, { }}, {3, {a}}, {4, {a}}, {X, { }}, {4, {a}},
+      {0, {a}}, {1, {a}}, {2, {a}}, {3, {a}}, {X, { }}, {3, {a}},
+      {1, {a}}, {2, {a}}, {3, {a}}, {2, {a}}, {1, {a}}, {2, {a}},
+      {2, {a}}, {X, { }}, {2, {a}}, {1, {a}}, {0, {a}}, {1, {a}},
+      {3, {a}}, {X, { }}, {X, { }}, {2, {a}}, {1, {a}}, {2, {a}},
+      {4, {a}}, {X, { }}, {4, {a}}, {3, {a}}, {2, {a}}, {3, {a}},
+      {5, {a}}, {X, { }}, {5, {a}}, {4, {a}}, {3, {a}}, {4, {a}}
+    };
+
+    std::vector<int> expected_distance_field {
+      X, X, 3, 4, X, 4,
+      0, 1, 2, 3, X, 3,
+      1, 2, 3, 2, 1, 2,
+      2, X, 2, 1, 0, 1,
+      3, X, X, 2, 1, 2,
+      4, X, 4, 3, 2, 3,
+      5, X, 5, 4, 3, 4
+    };
+
+    std::vector<std::vector<Grid<Tile>::index_type>> expected_sites {
+      { }, { }, {a}, {a}, { }, {a},
+      {a}, {a}, {a}, {a}, { }, {a},
+      {a}, {a}, {a}, {a}, {a}, {a},
+      {a}, { }, {a}, {a}, {a}, {a},
+      {a}, { }, { }, {a}, {a}, {a},
+      {a}, { }, {a}, {a}, {a}, {a},
+      {a}, { }, {a}, {a}, {a}, {a}
+    };
+
+    std::vector<int> actual_distance_field;
+    std::vector<std::vector<Index>> actual_sites;
+
+    std::for_each(expected.begin(), expected.end(), [&](const auto& cell) {
+      actual_distance_field.push_back(cell.distance);
+      actual_sites.emplace_back(std::move(cell.sites));
+    });
+
+    {
+      INFO(error_msg_distance_fields(width, height, actual_distance_field, expected_distance_field));
+      REQUIRE_THAT(actual_distance_field, Equals(expected_distance_field));
+    }
+
+    REQUIRE_THAT(actual_sites, Equals(expected_sites));
+  }
+
+  SECTION( "The second time, with three sites" ) {
+    const Index a = 10;
+    const Index b = 11;
+    const Index c = 26;
+
+    std::vector<Grid<Tile>::index_type> sites{a, b, c};
+
+    generate_voronoi_diagram(grid, sites.begin(), sites.end(), voronoi);
+
+    std::vector<CG::VoronoiTileDescriptor<Tile>> expected{
+      {X, { }}, {X, { }}, {4, {b}}, {4, {c}}, {X, { }}, {1, {a}},
+      {1, {b}}, {2, {b}}, {3, {b}}, {3, {c}}, {X, { }}, {0, {a}},
+      {0, {b}}, {1, {b}}, {2, {b}}, {2, {c}}, {2, {a}}, {1, {a}},
+      {1, {b}}, {X, { }}, {2, {c}}, {1, {c}}, {2, {c}}, {2, {a}},
+      {2, {b}}, {X, { }}, {X, { }}, {0, {c}}, {1, {c}}, {2, {c}},
+      {3, {b}}, {X, { }}, {2, {c}}, {1, {c}}, {2, {c}}, {3, {c}},
+      {4, {b}}, {X, { }}, {3, {c}}, {2, {c}}, {3, {c}}, {4, {c}}
+    };
+
+    std::vector<int> expected_distance_field{
+      X, X, 4, 4, X, 1,
+      1, 2, 3, 3, X, 0,
+      0, 1, 2, 2, 2, 1,
+      1, X, 2, 1, 2, 2,
+      2, X, X, 0, 1, 2,
+      3, X, 2, 1, 2, 3,
+      4, X, 3, 2, 3, 4
+    };
+
+    std::vector<std::vector<Index>> expected_sites{
+      { }, { }, {b}, {c}, { }, {a},
+      {b}, {b}, {b}, {c}, { }, {a},
+      {b}, {b}, {b}, {c}, {a}, {a},
+      {b}, { }, {c}, {c}, {c}, {a},
+      {b}, { }, { }, {c}, {c}, {c},
+      {b}, { }, {c}, {c}, {c}, {c},
+      {b}, { }, {c}, {c}, {c}, {c}
+    };
+
+    std::vector<int> actual_distance_field;
+    std::vector<std::vector<Index>> actual_sites;
+
+    std::for_each(expected.begin(), expected.end(), [&](const auto& cell) {
+      actual_distance_field.push_back(cell.distance);
+      actual_sites.emplace_back(std::move(cell.sites));
+    });
+
+    {
+      INFO(error_msg_distance_fields(width, height, actual_distance_field, expected_distance_field));
+      REQUIRE_THAT(actual_distance_field, Equals(expected_distance_field));
+    }
+
+    REQUIRE_THAT(actual_sites, Equals(expected_sites));
   }
 }
