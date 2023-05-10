@@ -23,7 +23,7 @@ class Grid {
 
   Grid() = default;
 
-   Grid(index_type width, index_type height)
+  Grid(index_type width, index_type height)
       : m_width{width}, m_height{height} {
     impl::compute_tiles_neighbours(width, height, m_neighbours_by_index);
   }

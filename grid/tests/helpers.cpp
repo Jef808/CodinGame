@@ -2,7 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
-#include <sstream>
+#include <iostream>
 #include <vector>
 
 #include "../constants.h"
@@ -13,20 +13,20 @@ inline bool is_one_digit(auto value) {
   return 0 <= value && value < 10;
 }
 
-std::stringstream& output_grid(
-    std::stringstream& ss,
+std::ostream& print_grid(
+    std::ostream& stream,
     int width,
     int height,
     const std::vector<int>& squares) {
   for (auto y = 0; y < height; ++y) {
     for (auto x = 0; x < width; ++x) {
       const auto value = squares[x + width * y];
-      ss << (value == INT::INFTY || value == -1 ? "X " : std::to_string(value))
-         << (is_one_digit(value) ? "  " : " ");
+      stream << (value == INT::INFTY || value == -1 ? "X " : std::to_string(value))
+             << (is_one_digit(value) ? "  " : " ");
     }
-    ss << '\n';
+    stream << '\n';
   }
-  return ss;
+  return stream;
 }
 
 std::string error_msg_distance_fields(
@@ -34,14 +34,14 @@ std::string error_msg_distance_fields(
     int height,
     const std::vector<int>& expected,
     const std::vector<int>& actual) {
-  std::stringstream ss;
-  ss << "Expected\n";
-  output_grid(ss, width, height, expected);
+  std::ostringstream stream;
+  stream << "Expected\n";
+  print_grid(stream, width, height, expected);
 
-  ss << "\nBut got\n";
-  output_grid(ss, width, height, actual);
+  stream << "\nBut got\n";
+  print_grid(stream, width, height, actual);
 
-  return ss.str();
+  return stream.str();
 }
 
 } // namespace CG

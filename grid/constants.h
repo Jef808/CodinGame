@@ -6,14 +6,15 @@
 namespace CG {
 
 // A distance of INFTY will mean the tile is unreachable.
+// TODO Template over DistanceT
 struct INT {
   static constexpr int INFTY = std::numeric_limits<int>::max();
   static constexpr int UNVISITED = -1;
 };
 
-template <typename Grid>
+template <typename IndexT>
 struct INDEX {
-  static constexpr typename Grid::index_type NONE = std::numeric_limits<typename Grid::index_type>::max();
+  static constexpr IndexT NONE = std::numeric_limits<IndexT>::max();
 };
 
 } // namespace CG
