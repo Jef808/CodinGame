@@ -2,22 +2,14 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED 20)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-add_library(matching
-  matrix.h
-  matrix.cpp
-  bipartite_matching.cpp
-)
-target_include_directories(matching
-  PUBLIC
-  ${CMAKE_CURRENT_SOURCE_DIR}
-)
-
 add_executable(${CMAKE_PROJECT_NAME}_MAIN
   main.cpp
   game.cpp
   agent.cpp
 )
 target_link_libraries(${CMAKE_PROJECT_NAME}_MAIN PRIVATE CG)
+
+add_subdirectory(tests)
 
 find_package(Python3 COMPONENTS Interpreter Development)
 add_custom_target(${CMAKE_PROJECT_NAME}_bundled

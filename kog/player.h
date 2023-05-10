@@ -6,8 +6,8 @@
 namespace kog {
 
 struct Player {
-  int id;
-  int matter;
+  int id{-1};
+  int matter{-1};
 };
 
 } // namespace kog

@@ -1,6 +1,8 @@
 #ifndef TILE_H_
 #define TILE_H_
 
+#include "point/point.h"
+
 #include <iostream>
 
 namespace kog {
@@ -20,11 +22,13 @@ struct Tile {
    * Check if tile can be used as part of a path.
    *
    * \param tile The tile in question.
-   * \param distance The distance of the tile from the start of the path.
+   * \param distance The number of turns until the tile would be used as part of the path.
    */
-  [[nodiscard]] bool is_blocked(int distance = 0) const {
+  [[nodiscard]] bool is_blocked(int distance = 1) const {
     return recycler || scrap_amount <= (in_range_of_recycler * distance);
   }
+
+  operator CG::Point() { return {x, y}; }
 };
 
 inline std::istream& operator>>(std::istream& stream, Tile& tile) {

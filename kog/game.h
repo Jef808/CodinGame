@@ -18,6 +18,8 @@ class Game {
   void initial_input(std::istream& stream);
   void turn_input(std::istream& stream);
 
+  void output_grid(std::ostream& stream);
+
   [[nodiscard]] const Grid& grid() const { return m_grid; }
   [[nodiscard]] const Player& me() const { return m_me; }
   [[nodiscard]] const Player& opp() const { return m_opp; }

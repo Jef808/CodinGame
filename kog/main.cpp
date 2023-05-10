@@ -14,11 +14,11 @@ int main(int argc, char *argv[]) {
   for (;;) {
     game.turn_input(std::cin);
 
-    agent.clear_info();
     agent.compute_turn_info();
     agent.debug(std::cerr);
 
-    std::cout << "WAIT" << std::endl;
+    agent.choose_actions();
+    agent.output_actions(std::cout);
   }
 
   return 0;

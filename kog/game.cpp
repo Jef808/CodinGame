@@ -5,8 +5,8 @@
 namespace kog {
 
 void Game::initial_input(std::istream& stream) {
-  int width;
-  int height;
+  int width = 0;
+  int height = 0;
   stream >> width
          >> height;
   m_grid.set_dimensions(width, height);
@@ -41,11 +41,29 @@ void Game::turn_input(std::istream& stream) {
 
   for (auto y = 0; y < m_grid.height(); ++y) {
     for (auto x = 0; x < m_grid.width(); ++x) {
-      auto& tile = tiles[m_grid.index_of(x, y)];
       stream >> tiles[m_grid.index_of(x, y)];
     }
   }
   m_grid.swap_tiles(tiles);
+}
+
+void Game::output_grid(std::ostream& stream) {
+  const auto width = m_grid.width();
+  const auto height = m_grid.height();
+
+  for (auto y = 0; y < height; ++y) {
+    for (auto x = 0; x < width; ++x) {
+      if (m_grid.at(m_grid.index_of(x, y)).is_blocked()) {
+        stream << 'B';
+      } else {
+        stream << 'F';
+      }
+      if (x < width - 1) {
+          stream << ' ';
+      }
+    }
+    stream << '\n';
+  }
 }
 
 } // namespace kog
