@@ -2,6 +2,8 @@
 """See __file__ --help."""
 
 import argparse
+from math import nan as NaN
+import re
 from pathlib import Path
 from os import access, R_OK, W_OK, X_OK
 
@@ -143,38 +145,110 @@ def main(sources: Path, output_filepath: Path, offline: bool):
         files = list(map(lambda source: dir / source.strip(),
                          sources.readlines()))
     include_directives = []
-    result = ""
-    if_macro_depth = 0
-    header_guard = False
+    offline_include_directives = []
+    include_directive_pattern = re.compile(
+        r'^#include ([<"])[\w./]+([>"])$'
+    )
+    result = []
+    current_preprocessor_directive_if_depth = 0
+    running_offline_preprocessor_condition_depth = NaN
+    header_guard_depth = NaN
+    is_next_after_header_guard_start = False
     for file in files:
         with open(file, encoding="utf8") as file:
-            for line in file.readlines():
-                if line.startswith('#include "'):
+            for line in (_line.rstrip() for _line in file.readlines()):
+                if not line:
                     continue
-                elif line.startswith('#include <'):
-                    include_directives.append(line)
+
+                if is_next_after_header_guard_start and line.startswith('#define'):
+                    is_next_after_header_guard_start = False
                     continue
-                elif (line.count('_H_' or '_HPP_')
-                      and (line.startswith('#ifndef')
-                           or line.startswith('#define'))):
-                    header_guard = True
-                    if_macro_depth = 1
-                    continue
-                elif line.startswith('#endif'):
-                    if header_guard:
-                        if_macro_depth -= 1
-                        if if_macro_depth == 0:
-                            header_guard = False
-                            continue
-                result += line
+
+                is_ignored_line = False
+
+                if line.startswith('#endif'):
+                    is_header_guard_end = (
+                        current_preprocessor_directive_if_depth
+                        == header_guard_depth)
+                    is_running_offline_preprocessor_condition_end = (
+                        current_preprocessor_directive_if_depth
+                        == running_offline_preprocessor_condition_depth)
+
+                    current_preprocessor_directive_if_depth -= 1
+
+                    if is_header_guard_end:
+                        header_guard_depth = NaN
+                        is_ignored_line = True
+
+                    if is_running_offline_preprocessor_condition_end:
+                        running_offline_preprocessor_condition_depth = NaN
+                        is_ignored_line = True
+
+                elif line.startswith('#if'):
+                    current_preprocessor_directive_if_depth += 1
+
+                    is_header_guard_start = (
+                        line[3:].startswith('ndef')
+                        and line.count('_H' or '_HPP'))
+                    is_running_offline_preprocessor_condition_start = (
+                        line[3:].startswith(' RUNNING_OFFLINE'))
+
+                    if is_header_guard_start:
+                        header_guard_depth = (
+                            current_preprocessor_directive_if_depth
+                        )
+                        is_next_after_header_guard_start = True
+                        is_ignored_line = True
+
+                    elif is_running_offline_preprocessor_condition_start:
+                        running_offline_preprocessor_condition_depth = (
+                            current_preprocessor_directive_if_depth
+                        )
+                        is_ignored_line = True
+
+                if not is_ignored_line:
+                    include_directive_match = (
+                        re.match(include_directive_pattern, line))
+                    is_maybe_include_directive = (
+                        include_directive_match is not None
+                    )
+                    is_local_include_directive = (
+                        is_maybe_include_directive and
+                        include_directive_match.group(1) == '"' and
+                        include_directive_match.group(2) == '"'
+                    )
+                    is_system_include_directive = (
+                        is_maybe_include_directive and
+                        include_directive_match.group(1) == '<' and
+                        include_directive_match.group(2) == '>'
+                    )
+                    is_include_directive = (is_local_include_directive
+                                            or is_system_include_directive)
+                    if is_include_directive:
+                        is_in_offline_preprocessor_condition_block = (
+                            current_preprocessor_directive_if_depth
+                            >= running_offline_preprocessor_condition_depth
+                        )
+                        if is_system_include_directive:
+                            include_directives_array = (
+                                offline_include_directives
+                                if is_in_offline_preprocessor_condition_block
+                                else include_directives
+                            )
+                            include_directives_array.append(line)
+                    else:
+                        result.append(line)
+
     with open(output_filepath, "w+") as out:
         out.write(optim_header)
         if offline:
             out.write(offline_header)
         out.write('\n')
-        out.write(''.join(sorted(set(include_directives))))
-        out.write('\n')
-        out.write(result)
+        out.write('\n'.join(sorted(set(include_directives))))
+        out.write('\n#if RUNNING_OFFLINE\n')
+        out.write('\n'.join(sorted(set(offline_include_directives))))
+        out.write('\n#endif\n')
+        out.write('\n'.join(result))
 
 
 if __name__ == '__main__':
@@ -185,4 +259,5 @@ if __name__ == '__main__':
     output = Path(args.output_directory).absolute() / args.output_filename
     if not output.suffix:
         output = output.with_suffix(".cpp")
+
     main(sources, output, args.offline)
