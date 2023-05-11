@@ -1,6 +1,5 @@
-set( CMAKE_CXX_STANDARD 17 )
-set( CMAKE_CXX_STANDARD_REQUIRED 17 )
-set( CMAKE_EXPORT_COMPILE_COMMANDS on )
+set( CMAKE_CXX_STANDARD 20 )
+set( CMAKE_CXX_STANDARD_REQUIRED 20 )
 
 # textures used by the viewer
 set( resources_dir ${CMAKE_SOURCE_DIR}/resources )

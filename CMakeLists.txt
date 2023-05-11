@@ -5,8 +5,8 @@ project(
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED 17)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED 20)
 
 set(scripts_DIR ${CMAKE_SOURCE_DIR}/scripts)
 
@@ -18,7 +18,8 @@ include(Catch)
 
 # Grid utils
 add_subdirectory(grid)
-add_library(CG INTERFACE grid/grid.h grid/bfs.h)
+
+add_library(CG INTERFACE point/point.h grid/grid.h grid/bfs.h)
 target_include_directories(CG INTERFACE ${CMAKE_SOURCE_DIR})
 
 project(EscapeTheCat)
