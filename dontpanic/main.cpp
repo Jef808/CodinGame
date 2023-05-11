@@ -61,7 +61,7 @@ int main(int argc, char* argv[])
     }
 
     std::string fn;
-    fmt::format_to(std::back_inserter(fn), "../data/test{}.txt", argv[1]);
+    fmt::format_to(std::back_inserter(fn), "data/test{}.txt", argv[1]);
 
     std::ifstream ifs { fn.data() };
 

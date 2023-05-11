@@ -1,6 +1,6 @@
 #include "dpview.h"
-#include "dp.h"
-#include "mgr.h"
+#include "../dp.h"
+#include "../mgr.h"
 
 #include <cassert>
 #include <string_view>
