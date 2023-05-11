@@ -10,13 +10,19 @@
 namespace kog {
 
 struct Action {
-  [[nodiscard]] virtual std::ostream& print(std::ostream&) const;
+    Action() = default;
+    [[nodiscard]] Action(const Action&) = default;
+    Action(Action&&) = delete;
+    Action& operator=(const Action&) = default;
+    Action& operator=(Action&&) = delete;
 
-  virtual ~Action() = default;
+    virtual std::ostream& print(std::ostream& stream) const { return stream; };
+
+    virtual ~Action() = default;
 };
 
-inline std::ostream& operator<<(std::ostream& os, const Action& action) {
-  return action.print(os);
+inline std::ostream& operator<<(std::ostream& stream, const Action& action) {
+  return action.print(stream);
 }
 
 struct Move: Action {
@@ -31,8 +37,8 @@ struct Move: Action {
   {
   }
 
-  [[nodiscard]] std::ostream& print(std::ostream& os) const override {
-    return os << "MOVE "
+  [[nodiscard]] std::ostream& print(std::ostream& stream) const override {
+    return stream << "MOVE "
               << number << ' '
               << source.x << ' ' << source.y << ' '
               << target.x << ' ' << target.y;
@@ -49,8 +55,8 @@ struct Spawn: Action {
   {
   }
 
-  [[nodiscard]] std::ostream& print(std::ostream& os) const override {
-    return os << "SPAWN "
+  [[nodiscard]] std::ostream& print(std::ostream& stream) const override {
+    return stream << "SPAWN "
               << number << ' ' << target.x << ' ' << target.y;
   }
 };
@@ -63,10 +69,34 @@ struct Build: Action {
   {
   }
 
-  [[nodiscard]] std::ostream& print(std::ostream& os) const override {
-    return os << "BUILD " << target.x << ' ' << target.y;
+  [[nodiscard]] std::ostream& print(std::ostream& stream) const override {
+    return stream << "BUILD " << target.x << ' ' << target.y;
   }
 };
+
+struct Wait: Action {
+  Wait() = default;
+
+  [[nodiscard]] std::ostream& print(std::ostream& stream) const override {
+    return stream << "WAIT";
+  }
+};
+
+inline std::ostream& make_move_action(std::ostream& stream, const Tile& tile_from, const Tile& tile_to, int number) {
+  return Move{tile_from, tile_to, number}.print(stream) << ';';
+}
+
+inline std::ostream& make_spawn_action(std::ostream& stream, const Tile& tile, int number) {
+  return Spawn{tile, number}.print(stream) << ';';
+}
+
+inline std::ostream& make_build_action(std::ostream& stream, const Tile& tile) {
+  return Build{tile}.print(stream) << ';';
+}
+
+inline std::ostream& make_wait_action(std::ostream& stream) {
+  return Wait{}.print(stream) << ';';
+}
 
 } // namespace kog
 

@@ -4,14 +4,11 @@
 #include "grid/bfs.h"
 
 #include "kog/actions.h"
-#include "kog/battlefront_info.h"
-#include "kog/units_info.h"
-#include "kog/territory_info.h"
-#include "kog/tiles_info.h"
 
 #include <algorithm>
 #include <numeric>
 #include <cmath>
+#include <sstream>
 
 namespace kog {
 
@@ -81,7 +78,7 @@ void Agent::compute_turn_info() {
   std::cerr << "Computed battlefronts info" << std::endl;
 }
 
-void Agent::choose_actions() {
+void Agent::choose_actions(std::ostream& stream) {
   m_actions.clear();
 
   const auto& grid = m_game.grid();
@@ -91,7 +88,7 @@ void Agent::choose_actions() {
   auto number_of_purchases = static_cast<int>(std::floor(m_game.me().matter / 10));
 
   // Choose defensive recyclers
-  for (auto target_index : m_my_boundary) {
+  for (auto target_index : m_tiles_info.my_boundary) {
     if (number_of_purchases == 0) {
       break;
     }
@@ -102,7 +99,8 @@ void Agent::choose_actions() {
     for (auto nbh_index : grid.neighbours_of(target_index)) {
       const auto& nbh_tile = grid.at(nbh_index);
       if (nbh_tile.owner == 0 && nbh_tile.units) {
-        m_actions.emplace_back(Build{target});
+        make_build_action(stream, target);
+
         recyclers.insert(target_index);
         --number_of_purchases;
         break;
@@ -113,48 +111,48 @@ void Agent::choose_actions() {
   std::cerr << "Chose defensive recyclers" << std::endl;
 
   // Choose spawns
-  std::sort(m_my_boundary.begin(), m_my_boundary.end(), [&](auto a, auto b) {
-    return m_my_frontier_distance_field[a] < m_my_frontier_distance_field[b];
-  });
-  while (number_of_purchases > 0) {
-    auto ndx = 0;
-    const auto boundary_size = m_my_boundary.size();
-    const auto target_index = m_my_boundary[ndx % boundary_size];
-    const auto& target = grid.at(target_index);
-    if (!target.can_spawn || recyclers.count(target_index)) {
-      continue;
-    }
-    m_actions.emplace_back(Spawn{target, grid.at(target_index).units});
-    --number_of_purchases;
-  }
+  // std::sort(m_tiles_info.my_boundary.begin(), m_tiles_info.my_boundary.end(), [&](auto a, auto b) {
+  //   return m_battlefronts_info.my_frontier_distance_field[a]
+  //       < m_battlefronts_info.my_frontier_distance_field[b];
+  // });
+  // while (number_of_purchases > 0) {
+  //   auto ndx = 0;
+  //   const auto boundary_size = m_tiles_info.my_boundary.size();
+  //   const auto target_index = m_tiles_info.my_boundary[ndx % boundary_size];
+  //   const auto& target = grid.at(target_index);
+  //   if (!target.can_spawn || recyclers.count(target_index)) {
+  //     continue;
+  //   }
 
-  std::cerr << "Chose spawns" << std::endl;
+  //   Spawn{target, grid.at(target_index).units}.print(stream) << ';';
+
+  //   --number_of_purchases;
+  // }
+
+  // std::cerr << "Chose spawns" << std::endl;
 
   // Choose economic recyclers
   // ...
   // ...
 
   // Choose moves towards the current frontier
-  move_towards_frontier();
-
+  move_towards_frontier(stream);
   std::cerr << "Chose moves" << std::endl;
+
+  make_wait_action(stream) << std::endl;
 }
 
-void Agent::output_actions(std::ostream& stream) const {
-  for (const auto& action : m_actions) {
-    stream << action << ';';
-  }
-  stream << std::endl;
-}
-
-void Agent::move_towards_frontier() {
+void Agent::move_towards_frontier(std::ostream& stream) {
   const auto& grid = m_game.grid();
 
-  for (auto unit : m_my_units) {
-    // the closest tile on my frontier
-    auto closest_frontier_tile = m_my_frontier_voronoi[unit][0];
-    Move move{ grid.at(unit), grid.at(closest_frontier_tile), grid.at(unit).units };
-    m_actions.push_back(move);
+  // const auto& my_frontier = m_battlefronts_info.my_frontier;
+  for (auto unit : m_units_info.my_units) {
+    const auto& from = grid.at(unit);
+    const auto& to_index = rand() % (grid.width() * grid.height() - 1);
+    const auto& to = grid.at(to_index);
+    // const auto& to = grid.at(my_frontier[rand() % my_frontier.size() - 1]);
+    const auto number = from.units;
+    make_move_action(stream, from, to, number);
   }
 }
 
@@ -280,20 +278,20 @@ void compute_territory_info(const Grid& grid, const UnitsInfo& units_info, Terri
       continue;
     }
     if (is_unreachable_by_opp) {
-      territory_info.my_projected_tiles.insert(index);
+      territory_info.my_territory.insert(index);
       continue;
     }
     if (is_unreachable_by_me) {
-      territory_info.opp_projected_tiles.insert(index);
+      territory_info.opp_territory.insert(index);
       continue;
     }
 
     // Compute distance difference for reachable tiles.
     const auto diff_distance = my_distance - opp_distance;
     if (diff_distance < 0) {
-      territory_info.my_projected_tiles.insert(index);
+      territory_info.my_territory.insert(index);
     } else if (diff_distance > 0) {
-      territory_info.opp_projected_tiles.insert(index);
+      territory_info.opp_territory.insert(index);
     } else {
       territory_info.neutral_frontier.insert(index);
     }
@@ -306,8 +304,8 @@ void compute_battlefronts_info(const Game::Grid& grid,
                                BattlefrontsInfo& battlefronts_info) {
   battlefronts_info.clear();
   const auto& neutral_frontier = territory_info.neutral_frontier;
-  const auto& my_territory = territory_info.my_projected_tiles;
-  const auto& opp_territory = territory_info.opp_projected_tiles;
+  const auto& my_territory = territory_info.my_territory;
+  const auto& opp_territory = territory_info.opp_territory;
 
   std::fill_n(
       std::back_inserter(battlefronts_info.my_frontier_distance_field),

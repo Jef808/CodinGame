@@ -1,5 +1,5 @@
-#ifndef BATTLEFRONT_INFO_H_
-#define BATTLEFRONT_INFO_H_
+#ifndef BATTLEFRONTS_INFO_H_
+#define BATTLEFRONTS_INFO_H_
 
 #include <vector>
 
@@ -23,4 +23,4 @@ struct BattlefrontsInfo {
 
 } // namespace kog
 
-#endif // BATTLEFRONT_INFO_H_
+#endif // BATTLEFRONTS_INFO_H_

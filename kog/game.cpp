@@ -4,6 +4,11 @@
 
 namespace kog {
 
+Game::Game(Grid&& grid)
+  : m_grid{grid}
+{
+}
+
 void Game::initial_input(std::istream& stream) {
   int width = 0;
   int height = 0;

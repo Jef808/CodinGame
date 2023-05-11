@@ -17,8 +17,7 @@ int main(int argc, char *argv[]) {
     agent.compute_turn_info();
     agent.debug(std::cerr);
 
-    agent.choose_actions();
-    agent.output_actions(std::cout);
+    agent.choose_actions(std::cout);
   }
 
   return 0;

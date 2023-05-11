@@ -28,7 +28,7 @@ struct Tile {
     return recycler || scrap_amount <= (in_range_of_recycler * distance);
   }
 
-  operator CG::Point() { return {x, y}; }
+  operator CG::Point() const { return {x, y}; }
 };
 
 inline std::istream& operator>>(std::istream& stream, Tile& tile) {

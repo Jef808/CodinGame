@@ -14,6 +14,7 @@ class Game {
   using Grid = CG::Grid<Tile>;
 
   Game() = default;
+  Game(Grid&& grid);
 
   void initial_input(std::istream& stream);
   void turn_input(std::istream& stream);
