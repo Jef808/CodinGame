@@ -1,0 +1,71 @@
+#+title: Code vs Zombies
+
+* Instructions
+** The Goal
+Destroy zombies quickly to earn points and make sure to keep the humans alive to get the highest score that you can manage.
+
+** Rules
+The game is played in a zone 16000 units wide by 9000 units high. You control a man named Ash, wielding a gun that lets him kill any zombie within a certain range around him.
+
+*** Ash
+Ash can be told to move to any point within the game zone by outputting a coordinate X Y. The top-left point is 0 0.
+Each turn, Ash will move exactly 1000 units towards the target coordinate, or onto the target coordinates if he is less than 1000 units away.
+If at the end of a turn, a zombie is within 2000 units of Ash, he will shoot that zombie and destroy it. More details on combat further down.
+
+Other humans will be present in the game zone, but will not move. If zombies kill all of them, you lose the game and score 0 points for the current test case.
+
+Zombies are placed around the game zone at the start of the game, they must be destroyed to earn points.
+
+*** Zombies
+Each turn, every zombie will target the closest human, including Ash, and step 400 units towards them. If the zombie is less than 400 units away, the human is killed and the zombie moves onto their coordinate.
+Two zombies may occupy the same coordinate.
+
+*** Action ordering
+In between two rounds, the order in which actions happens is as follows:
+1. Zombies move towards their targets.
+2. Ash moves towards his target.
+3. Any zombie within a 2000 unit range around Ash is destroyed.
+4. Zombies eat any human they share coordinates with.
+
+*** Scoring
+A zombie is worth ten times the square of the number of humans still alive, not including Ash.
+If several zombies are destroyed on the same round, the worth of the nth zombie killed is multiplied by the (n+2)'th Fibonnacci number (1, 2, 3, 5, 8, 13, ...). As a consequence, you should kill the maximum amount of zombies during a same turn.
+
+** Expert Rules
+The coordinate system of the game uses whole numbers only. If Ash or a zombie should land in a non whole coordinate, that coordinate is rounded down.
+
+For example, if a zombie were to move from X=0, Y=0 towards X=500, Y=500, since it may only travel 400 units in one turn it should land on X=282.843, Y=282.843 but will in fact land on X=282, Y=282.
+
+To help, each zombie's future coordinates will be sent along side the current coordinates.
+
+** IO rules
+The program must, within an infinite loop, read the contextual data from the standard input (human and zombie positions) and provide to the standard output the desired instruction.
+
+*** Turn input
+- *Line 1:*
+  two space-separated integers `x` and `y`, the coordinate of your character.
+
+- *Line 2:*
+  one integer `humanCount`, the amount of other humans still alive.
+
+- *Next `humanCount` lines:*
+  three space-separated integers `humanId`, `humanX` and `humanY`, the unique id and coordinates of a human.
+
+- *Next line:*
+  one integer `zombieCount`, the amount of zombies left to destroy.
+
+- *Next `zombieCount` lines:*
+  five space-separated integers `zombieId`, `zombieX`, `zombieY`, `zombieXNext` and `zombieYNext`, the unique id, current coordinates and future coordinates of a zombie.
+
+*** Turn output
+two space separated integers `targetX` and `targetY`, the coordinate you want your character to move towards. You may also output some text `message` which will be displayed on screen.
+** Constraints
+- 0 ≤ `x` < 16000
+
+- 0 ≤ `y` < 9000
+
+- 1 ≤ `humanCount` < 100
+
+- 1 ≤ `zombieCount` < 100
+
+- Response time per game turn ≤ 100ms
